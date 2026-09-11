@@ -23,7 +23,7 @@ export default function OfferMarquee() {
         zIndex: 60,
         height: MARQUEE_HEIGHT,
         overflow: 'hidden',
-        background: '#000',
+        background: '#fff',
       }}
     >
       <div
@@ -47,13 +47,13 @@ export default function OfferMarquee() {
                   fontSize: 11,
                   fontWeight: 500,
                   letterSpacing: '0.14em',
-                  color: '#fff',
+                  color: '#000',
                   whiteSpace: 'nowrap',
                   padding: '0 28px',
                 }}
               >
                 {MESSAGE}
-                <span style={{ margin: '0 28px', color: '#666' }} aria-hidden="true">●</span>
+                <span style={{ margin: '0 28px', color: '#999' }} aria-hidden="true">●</span>
               </span>
             ))}
           </div>
