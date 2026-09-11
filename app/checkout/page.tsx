@@ -345,7 +345,7 @@ function CheckoutPage() {
     });
     await saveAddressAfterOrder();
     clearCart();
-    router.push(`/account/orders?order=${data.id}${isGuest ? '&guest=1' : ''}`);
+    router.push(`/order-confirmation?order=${data.id}${isGuest ? '&guest=1' : ''}`);
   }
 
   async function handleRazorpaySubmit() {
@@ -412,7 +412,7 @@ function CheckoutPage() {
             });
             await saveAddressAfterOrder();
             clearCart();
-            router.push(`/account/orders?order=${order.id}${isGuest ? '&guest=1' : ''}`);
+            router.push(`/order-confirmation?order=${order.id}${isGuest ? '&guest=1' : ''}`);
             resolve();
           } catch (err) {
             reject(err);

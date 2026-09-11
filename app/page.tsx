@@ -1,9 +1,12 @@
 import Link from 'next/link';
 import Image from 'next/image';
+import OfferMarquee from '@/components/OfferMarquee';
 
 export default function Home() {
   return (
     <main className="bg-white">
+
+      <OfferMarquee />
 
       {/* ── CATEGORY SHOWCASE (homepage remake v1) ── */}
       <section className="w-full bg-white">
@@ -17,7 +20,7 @@ export default function Home() {
               <Image src="/images/front-page/homepage-remake/essentials-2.jpg" alt="Everyday Essentials" fill style={{ objectFit: 'cover' }} sizes="50vw" priority />
             </Link>
           </div>
-          <div className="block md:hidden" style={{ paddingTop: 'clamp(80px, 18vw, 140px)' }}>
+          <div className="block md:hidden">
             <Link href="/product/basic-relaxed-fit-white-t-shirt" className="relative overflow-hidden block" style={{ aspectRatio: '2/3', marginLeft: '4%', marginRight: '4%' }}>
               <Image src="/images/front-page/homepage-remake/essentials-1.jpg" alt="Everyday Essentials" fill style={{ objectFit: 'cover' }} sizes="92vw" priority />
             </Link>
