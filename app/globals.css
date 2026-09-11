@@ -1,0 +1,73 @@
+@import "tailwindcss";
+
+@theme inline {
+  --color-ham-cream: #faf7f2;
+  --color-ham-border: #e6e6e6;
+  --color-ham-label-bg: #f5f2f2;
+  --color-ham-newsletter: #121212;
+  --color-ham-footer: #0d0d0d;
+  --color-ham-green: #b2cc99;
+  --color-ham-muted: #8a8a8a;
+  --font-inter: var(--font-inter);
+  --font-alexandria: var(--font-alexandria);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-family: var(--font-inter), sans-serif;
+}
+
+body {
+  background: #faf7f2;
+  color: #000;
+  -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
+}
+
+/* ── Skeleton shimmer for image placeholders ── */
+@keyframes shimmer {
+  0%   { background-position: -400px 0; }
+  100% { background-position: 400px 0; }
+}
+
+.brand-story-section {
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+@media (min-width: 768px) {
+  .brand-story-section {
+    padding-top: 32px;
+    padding-bottom: 32px;
+  }
+}
+
+.img-skeleton {
+  background: linear-gradient(90deg, #f0ede8 25%, #e8e4df 50%, #f0ede8 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s infinite linear;
+}
+
+/* ── Mobile-only font sizes: shop + single product pages only ── */
+@media (max-width: 767px) {
+  /* Shop page: 11px for all text */
+  .mobile-font-shop,
+  .mobile-font-shop * {
+    font-size: 11px !important;
+  }
+
+  /* Single product page: 12px for body/small text … */
+  .mobile-font-product,
+  .mobile-font-product * {
+    font-size: 12px !important;
+  }
+  /* … 13px for headings (product title + section labels) */
+  .mobile-font-product .mobile-heading,
+  .mobile-font-product .mobile-heading * {
+    font-size: 13px !important;
+  }
+}
