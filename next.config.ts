@@ -5,6 +5,11 @@ const wpHostname = process.env.NEXT_PUBLIC_WP_URL
   : '';
 
 const nextConfig: NextConfig = {
+  // Default is 60s. Our WooCommerce host is shared hosting, not built for build-time
+  // bursts — this gives slow product/variation fetches room to finish instead of
+  // failing the whole deploy. See VARIATION_FETCH_CONCURRENCY in app/shop/page.tsx
+  // for the actual fix (limiting concurrent requests); this is just a safety margin.
+  staticPageGenerationTimeout: 180,
   images: {
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 2592000,
