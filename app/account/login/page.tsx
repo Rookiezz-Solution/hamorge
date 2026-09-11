@@ -6,23 +6,13 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
 export default function LoginPage() {
-  const { login, forgotPassword, sendLoginOtp, verifyLoginOtp } = useAuth();
+  const { login, forgotPassword } = useAuth();
   const router = useRouter();
-
-  const [method, setMethod] = useState<'email' | 'phone'>('email');
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-
-  // Phone/OTP login — two steps: enter phone, then enter the code sent to it.
-  const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
-  const [otpStep, setOtpStep] = useState<'phone' | 'code'>('phone');
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [otpError, setOtpError] = useState('');
-  const [otpSentMsg, setOtpSentMsg] = useState('');
 
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
@@ -46,34 +36,6 @@ export default function LoginPage() {
     router.push('/');
   }
 
-  async function handleSendOtp(e: React.FormEvent) {
-    e.preventDefault();
-    setOtpLoading(true);
-    setOtpError('');
-    setOtpSentMsg('');
-    const err = await sendLoginOtp(phone);
-    setOtpLoading(false);
-    if (err) { setOtpError(err); return; }
-    setOtpStep('code');
-    setOtpSentMsg(`Code sent to ${phone}.`);
-  }
-
-  async function handleVerifyOtp(e: React.FormEvent) {
-    e.preventDefault();
-    setOtpLoading(true);
-    setOtpError('');
-    const err = await verifyLoginOtp(phone, otp);
-    setOtpLoading(false);
-    if (err) { setOtpError(err); return; }
-    router.push('/');
-  }
-
-  function switchMethod(next: 'email' | 'phone') {
-    setMethod(next);
-    setError('');
-    setOtpError('');
-  }
-
   async function handleForgot(e: React.FormEvent) {
     e.preventDefault();
     setForgotLoading(true);
@@ -94,149 +56,55 @@ export default function LoginPage() {
             LOG IN
           </p>
 
-          {/* EMAIL / PHONE method toggle */}
-          <div style={{ display: 'flex', gap: 32, marginBottom: 32, borderBottom: '1px solid #eee' }}>
-            {(['email', 'phone'] as const).map(m => (
+
+          <form onSubmit={handleLogin}>
+            <div style={{ marginBottom: 28 }}>
+              <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', fontWeight: 400, letterSpacing: '0.10em', color: '#000', marginBottom: 10 }}>EMAIL</p>
+              <input type="email" required value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
+            </div>
+
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', fontWeight: 400, letterSpacing: '0.10em', color: '#000', marginBottom: 10 }}>PASSWORD</p>
+              <input type="password" required value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} />
+            </div>
+
+            <p
+              onClick={() => setForgotOpen(true)}
+              style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#000', letterSpacing: '0.08em', marginBottom: 20, cursor: 'pointer', textDecoration: 'underline', display: 'inline-block' }}
+            >
+              FORGOT PASSWORD?
+            </p>
+
+            {error && (
+              <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#c00', marginBottom: 16 }}>{error}</p>
+            )}
+
+            <div style={{ marginBottom: 24 }}>
               <button
-                key={m}
-                type="button"
-                onClick={() => switchMethod(m)}
+                type="submit"
+                disabled={loading}
                 style={{
-                  background: 'none', border: 'none', cursor: 'pointer', padding: '0 0 14px 0',
-                  fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', letterSpacing: '0.10em',
-                  color: method === m ? '#000' : '#999',
-                  borderBottom: method === m ? '2px solid #000' : '2px solid transparent',
-                  marginBottom: -1,
+                  width: '100%', height: 64, border: '1px solid #000', background: loading ? '#f5f5f5' : '#fff',
+                  fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', fontWeight: 400,
+                  letterSpacing: '0.12em', color: '#000', cursor: loading ? 'not-allowed' : 'pointer',
                 }}
               >
-                {m === 'email' ? 'EMAIL' : 'PHONE OTP'}
+                {loading ? 'LOGGING IN…' : 'LOG IN'}
               </button>
-            ))}
-          </div>
-
-          {method === 'email' ? (
-            <form onSubmit={handleLogin}>
-              <div style={{ marginBottom: 28 }}>
-                <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', fontWeight: 400, letterSpacing: '0.10em', color: '#000', marginBottom: 10 }}>EMAIL</p>
-                <input type="email" required value={email} onChange={e => setEmail(e.target.value)} style={inputStyle} />
-              </div>
-
-              <div style={{ marginBottom: 20 }}>
-                <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', fontWeight: 400, letterSpacing: '0.10em', color: '#000', marginBottom: 10 }}>PASSWORD</p>
-                <input type="password" required value={password} onChange={e => setPassword(e.target.value)} style={inputStyle} />
-              </div>
-
-              <p
-                onClick={() => setForgotOpen(true)}
-                style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#000', letterSpacing: '0.08em', marginBottom: 20, cursor: 'pointer', textDecoration: 'underline', display: 'inline-block' }}
-              >
-                FORGOT PASSWORD?
+              <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#555', marginTop: 16, textAlign: 'left' }}>
+                Don&apos;t have an account?{' '}
+                <Link href="/account/register" style={{ color: '#000', textDecoration: 'underline' }}>
+                  Create one
+                </Link>
               </p>
-
-              {error && (
-                <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#c00', marginBottom: 16 }}>{error}</p>
-              )}
-
-              <div style={{ marginBottom: 24 }}>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  style={{
-                    width: '100%', height: 64, border: '1px solid #000', background: loading ? '#f5f5f5' : '#fff',
-                    fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', fontWeight: 400,
-                    letterSpacing: '0.12em', color: '#000', cursor: loading ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  {loading ? 'LOGGING IN…' : 'LOG IN'}
-                </button>
-                <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#555', marginTop: 16, textAlign: 'left' }}>
-                  Don&apos;t have an account?{' '}
-                  <Link href="/account/register" style={{ color: '#000', textDecoration: 'underline' }}>
-                    Create one
-                  </Link>
-                </p>
-              </div>
-            </form>
-          ) : otpStep === 'phone' ? (
-            <form onSubmit={handleSendOtp}>
-              <div style={{ marginBottom: 28 }}>
-                <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', fontWeight: 400, letterSpacing: '0.10em', color: '#000', marginBottom: 10 }}>PHONE NUMBER</p>
-                <input
-                  type="tel" inputMode="numeric" required placeholder="10-digit mobile number"
-                  value={phone} onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  style={inputStyle}
-                />
-              </div>
-
-              {otpError && (
-                <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#c00', marginBottom: 16 }}>{otpError}</p>
-              )}
-
-              <div style={{ marginBottom: 24 }}>
-                <button
-                  type="submit"
-                  disabled={otpLoading || phone.length !== 10}
-                  style={{
-                    width: '100%', height: 64, border: '1px solid #000', background: otpLoading ? '#f5f5f5' : '#fff',
-                    fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', fontWeight: 400,
-                    letterSpacing: '0.12em', color: phone.length === 10 ? '#000' : '#bbb',
-                    cursor: otpLoading || phone.length !== 10 ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  {otpLoading ? 'SENDING CODE…' : 'SEND OTP'}
-                </button>
-                <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#555', marginTop: 16, textAlign: 'left' }}>
-                  Don&apos;t have an account?{' '}
-                  <Link href="/account/register" style={{ color: '#000', textDecoration: 'underline' }}>
-                    Create one
-                  </Link>
-                </p>
-              </div>
-            </form>
-          ) : (
-            <form onSubmit={handleVerifyOtp}>
-              {otpSentMsg && (
-                <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#555', marginBottom: 20 }}>{otpSentMsg}</p>
-              )}
-
-              <div style={{ marginBottom: 20 }}>
-                <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', fontWeight: 400, letterSpacing: '0.10em', color: '#000', marginBottom: 10 }}>ENTER OTP</p>
-                <input
-                  type="text" inputMode="numeric" required autoFocus placeholder="6-digit code"
-                  value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                  style={inputStyle}
-                />
-              </div>
-
-              <p
-                onClick={() => { setOtpStep('phone'); setOtp(''); setOtpError(''); setOtpSentMsg(''); }}
-                style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#000', letterSpacing: '0.08em', marginBottom: 20, cursor: 'pointer', textDecoration: 'underline', display: 'inline-block' }}
-              >
-                CHANGE NUMBER / RESEND
-              </p>
-
-              {otpError && (
-                <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#c00', marginBottom: 16 }}>{otpError}</p>
-              )}
-
-              <div style={{ marginBottom: 24 }}>
-                <button
-                  type="submit"
-                  disabled={otpLoading || otp.length !== 6}
-                  style={{
-                    width: '100%', height: 64, border: '1px solid #000', background: otpLoading ? '#f5f5f5' : '#fff',
-                    fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', fontWeight: 400,
-                    letterSpacing: '0.12em', color: otp.length === 6 ? '#000' : '#bbb',
-                    cursor: otpLoading || otp.length !== 6 ? 'not-allowed' : 'pointer',
-                  }}
-                >
-                  {otpLoading ? 'VERIFYING…' : 'VERIFY & LOG IN'}
-                </button>
-              </div>
-            </form>
-          )}
+            </div>
+          </form>
 
           <div style={{ height: 1, background: '#eee', marginBottom: 24 }} />
+
+          <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', fontWeight: 400, letterSpacing: '0.10em', color: '#000', marginBottom: 16 }}>
+            ACCESS WITH
+          </p>
 
           <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#555', lineHeight: 1.6 }}>
             By logging in, I agree to link my account in accordance with the{' '}
