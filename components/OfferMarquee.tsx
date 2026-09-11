@@ -8,7 +8,7 @@ const REPEATS = 8;
 // Fixed (not responsive) so it matches exactly — components/layout/Navbar.tsx
 // reads this same number to shift its own fixed header down on the homepage,
 // so the two stack without a gap or an overlap. Keep them in sync if changed.
-export const MARQUEE_HEIGHT = 36;
+export const MARQUEE_HEIGHT = 28;
 
 export default function OfferMarquee() {
   const items = Array.from({ length: REPEATS });
@@ -44,16 +44,16 @@ export default function OfferMarquee() {
                   display: 'inline-flex',
                   alignItems: 'center',
                   fontFamily: 'var(--font-inter)',
-                  fontSize: 11,
+                  fontSize: 9,
                   fontWeight: 500,
-                  letterSpacing: '0.14em',
+                  letterSpacing: '0.12em',
                   color: '#000',
                   whiteSpace: 'nowrap',
-                  padding: '0 28px',
+                  padding: '0 20px',
                 }}
               >
                 {MESSAGE}
-                <span style={{ margin: '0 28px', color: '#999' }} aria-hidden="true">●</span>
+                <span style={{ margin: '0 20px', color: '#999' }} aria-hidden="true">●</span>
               </span>
             ))}
           </div>

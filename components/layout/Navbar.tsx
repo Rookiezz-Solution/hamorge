@@ -8,6 +8,7 @@ import { useCart } from '@/context/CartContext';
 import { useFavourites } from '@/context/FavouritesContext';
 import { useAuth } from '@/context/AuthContext';
 import SearchOverlay from '@/components/layout/SearchOverlay';
+import { MARQUEE_HEIGHT } from '@/components/OfferMarquee';
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -69,7 +70,7 @@ export default function Navbar() {
           // MARQUEE_HEIGHT (see components/OfferMarquee.tsx) — shift the header
           // down by that exact amount so the two stack without overlapping.
           // Every other page has no marquee, so the header stays flush at top:0.
-          top: isHome ? 36 : 0,
+          top: isHome ? MARQUEE_HEIGHT : 0,
           height: 64,
           background: isHome && scrolled ? '#fff' : 'transparent',
           boxShadow: isHome && scrolled ? '0 1px 12px rgba(0,0,0,0.07)' : 'none',

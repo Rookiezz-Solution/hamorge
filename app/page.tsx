@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import OfferMarquee from '@/components/OfferMarquee';
+import OfferMarquee, { MARQUEE_HEIGHT } from '@/components/OfferMarquee';
 
 export default function Home() {
   return (
@@ -23,7 +23,7 @@ export default function Home() {
           {/* Mobile clears the fixed header + the marquee stacked above it (36px,
               see OfferMarquee's MARQUEE_HEIGHT) — desktop intentionally has no
               padding here, letting the hero bleed under the transparent nav. */}
-          <div className="block md:hidden" style={{ paddingTop: 'calc(clamp(80px, 18vw, 140px) + 36px)' }}>
+          <div className="block md:hidden" style={{ paddingTop: `calc(clamp(80px, 18vw, 140px) + ${MARQUEE_HEIGHT}px)` }}>
             <Link href="/product/basic-relaxed-fit-white-t-shirt" className="relative overflow-hidden block" style={{ aspectRatio: '2/3', marginLeft: '4%', marginRight: '4%' }}>
               <Image src="/images/front-page/homepage-remake/essentials-1.jpg" alt="Everyday Essentials" fill style={{ objectFit: 'cover' }} sizes="92vw" priority />
             </Link>
