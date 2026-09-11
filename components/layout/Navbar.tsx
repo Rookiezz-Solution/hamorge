@@ -63,8 +63,13 @@ export default function Navbar() {
   return (
     <>
       <header
-        className="fixed top-0 left-0 right-0 z-50 transition-all duration-300"
+        className="fixed left-0 right-0 z-50 transition-all duration-300"
         style={{
+          // On the homepage, the OfferMarquee sits fixed above this header at
+          // MARQUEE_HEIGHT (see components/OfferMarquee.tsx) — shift the header
+          // down by that exact amount so the two stack without overlapping.
+          // Every other page has no marquee, so the header stays flush at top:0.
+          top: isHome ? 36 : 0,
           height: 64,
           background: isHome && scrolled ? '#fff' : 'transparent',
           boxShadow: isHome && scrolled ? '0 1px 12px rgba(0,0,0,0.07)' : 'none',
