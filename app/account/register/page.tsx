@@ -1,25 +1,12 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import {
-  createRecaptchaVerifier, removeRecaptchaContainer, sendFirebaseOtp, firebaseConfigured, type ConfirmationResult,
-} from '@/lib/firebase-client';
-import type { RecaptchaVerifier } from 'firebase/auth';
-
-/** Firebase's own error codes are prefixed like "auth/invalid-phone-number" — map the common ones to plain copy. */
-function friendlyFirebaseError(message: string): string {
-  if (message.includes('invalid-phone-number')) return 'Enter a valid 10-digit phone number.';
-  if (message.includes('too-many-requests')) return 'Too many attempts. Please try again later.';
-  if (message.includes('invalid-verification-code') || message.includes('code-expired')) return 'Incorrect or expired code.';
-  if (message.includes('quota-exceeded')) return 'SMS limit reached. Please try again later.';
-  return message;
-}
 
 export default function RegisterPage() {
-  const { register } = useAuth();
+  const { register, sendLoginOtp } = useAuth();
   const router = useRouter();
 
   const [firstName, setFirstName] = useState('');
@@ -41,66 +28,42 @@ export default function RegisterPage() {
   const [otpError, setOtpError] = useState('');
   const [otpSentMsg, setOtpSentMsg] = useState('');
 
-  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
-  const confirmationRef = useRef<ConfirmationResult | null>(null);
-
-  useEffect(() => {
-    return () => { recaptchaRef.current?.clear(); recaptchaRef.current = null; removeRecaptchaContainer(); };
-  }, []);
-
   const inputStyle: React.CSSProperties = {
     width: '100%', border: 'none', borderBottom: '1px solid #000',
     fontFamily: 'var(--font-inter)', fontSize: 12, letterSpacing: '0.08em',
     color: '#000', padding: '8px 0', outline: 'none', background: 'transparent',
   };
 
-  // Step 1: validate the form, then send the phone OTP — the account itself
-  // isn't created here, only once the code is verified (see handleVerifyOtp).
+  // Step 1: validate the form, then send the phone OTP (via MSG91) — the
+  // account itself isn't created here, only once the code is verified
+  // (see handleVerifyOtp), and MSG91's verify call happens server-side,
+  // atomically with account creation, in /api/auth/register.
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!agreed) { setError('Please accept the Privacy Policy to continue.'); return; }
     if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
     if (!/^\d{10}$/.test(phone)) { setError('Enter a valid 10-digit phone number.'); return; }
-    if (!firebaseConfigured) { setError('Phone verification is not set up yet.'); return; }
 
     setLoading(true);
     setError('');
-    try {
-      recaptchaRef.current = createRecaptchaVerifier(recaptchaRef.current);
-      confirmationRef.current = await sendFirebaseOtp(`+91${phone}`, recaptchaRef.current);
-      setStep('otp');
-      setOtpSentMsg(`Code sent to +91${phone}.`);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Could not send the code. Please try again.';
-      setError(friendlyFirebaseError(message));
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = null;
-    } finally {
-      setLoading(false);
-    }
+    const err = await sendLoginOtp(phone);
+    setLoading(false);
+    if (err) { setError(err); return; }
+    setStep('otp');
+    setOtpSentMsg(`Code sent to +91${phone}.`);
   }
 
-  // Step 2: confirm the code, then actually create the account with the
-  // resulting Firebase ID token — the backend re-verifies it matches `phone`.
+  // Step 2: submit the code together with the form details — the account is
+  // created only if MSG91 confirms the code server-side (see the route).
   async function handleVerifyOtp(e: React.FormEvent) {
     e.preventDefault();
     setOtpLoading(true);
     setOtpError('');
-    try {
-      if (!confirmationRef.current) throw new Error('Please request a new code.');
-      const result = await confirmationRef.current.confirm(otp);
-      const firebaseIdToken = await result.user.getIdToken();
-
-      const err = await register({ firstName, lastName, email, phone, password, firebaseIdToken });
-      if (err) { setOtpError(err); return; }
-      setSuccess(true);
-      setTimeout(() => router.push('/'), 2000);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Invalid or expired code.';
-      setOtpError(friendlyFirebaseError(message));
-    } finally {
-      setOtpLoading(false);
-    }
+    const err = await register({ firstName, lastName, email, phone, password, otp });
+    setOtpLoading(false);
+    if (err) { setOtpError(err); return; }
+    setSuccess(true);
+    setTimeout(() => router.push('/'), 2000);
   }
 
   if (success) {

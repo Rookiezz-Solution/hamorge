@@ -1,25 +1,12 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
-import {
-  createRecaptchaVerifier, removeRecaptchaContainer, sendFirebaseOtp, firebaseConfigured, type ConfirmationResult,
-} from '@/lib/firebase-client';
-import type { RecaptchaVerifier } from 'firebase/auth';
-
-/** Firebase's own error codes are prefixed like "auth/invalid-phone-number" — map the common ones to plain copy. */
-function friendlyFirebaseError(message: string): string {
-  if (message.includes('invalid-phone-number')) return 'Enter a valid 10-digit phone number.';
-  if (message.includes('too-many-requests')) return 'Too many attempts. Please try again later.';
-  if (message.includes('invalid-verification-code') || message.includes('code-expired')) return 'Incorrect or expired code.';
-  if (message.includes('quota-exceeded')) return 'SMS limit reached. Please try again later.';
-  return message;
-}
 
 export default function LoginPage() {
-  const { login, forgotPassword, verifyFirebasePhoneLogin } = useAuth();
+  const { login, forgotPassword, sendLoginOtp, verifyLoginOtp } = useAuth();
   const router = useRouter();
 
   const [method, setMethod] = useState<'password' | 'otp'>('password');
@@ -29,24 +16,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  // Phone OTP (Firebase) — two steps: enter phone, then the code sent to it.
-  // Firebase runs the whole send/verify exchange client-side; our backend only
-  // ever sees the resulting ID token, which it verifies server-side before
-  // trusting the phone number at all (see /api/auth/firebase-verify).
+  // Phone OTP (MSG91) — two steps: enter phone, then the code sent to it.
   const [phone, setPhone] = useState('');
   const [otp, setOtp] = useState('');
   const [otpStep, setOtpStep] = useState<'phone' | 'code'>('phone');
   const [otpLoading, setOtpLoading] = useState(false);
   const [otpError, setOtpError] = useState('');
   const [otpSentMsg, setOtpSentMsg] = useState('');
-
-  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
-  const confirmationRef = useRef<ConfirmationResult | null>(null);
-
-  useEffect(() => {
-    // Tear down the reCAPTCHA widget on unmount so a stale instance never lingers.
-    return () => { recaptchaRef.current?.clear(); recaptchaRef.current = null; removeRecaptchaContainer(); };
-  }, []);
 
   const [forgotOpen, setForgotOpen] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
@@ -75,40 +51,21 @@ export default function LoginPage() {
     setOtpLoading(true);
     setOtpError('');
     setOtpSentMsg('');
-    try {
-      recaptchaRef.current = createRecaptchaVerifier(recaptchaRef.current);
-      const e164 = `+91${phone}`;
-      confirmationRef.current = await sendFirebaseOtp(e164, recaptchaRef.current);
-      setOtpStep('code');
-      setOtpSentMsg(`Code sent to ${e164}.`);
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Could not send the code. Please try again.';
-      setOtpError(friendlyFirebaseError(message));
-      // A failed attempt can leave the widget unusable — reset so retry works cleanly.
-      recaptchaRef.current?.clear();
-      recaptchaRef.current = null;
-    } finally {
-      setOtpLoading(false);
-    }
+    const err = await sendLoginOtp(phone);
+    setOtpLoading(false);
+    if (err) { setOtpError(err); return; }
+    setOtpStep('code');
+    setOtpSentMsg(`Code sent to +91${phone}.`);
   }
 
   async function handleVerifyOtp(e: React.FormEvent) {
     e.preventDefault();
     setOtpLoading(true);
     setOtpError('');
-    try {
-      if (!confirmationRef.current) throw new Error('Please request a new code.');
-      const result = await confirmationRef.current.confirm(otp);
-      const idToken = await result.user.getIdToken();
-      const err = await verifyFirebasePhoneLogin(idToken);
-      if (err) { setOtpError(err); return; }
-      router.push('/');
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Invalid or expired code.';
-      setOtpError(friendlyFirebaseError(message));
-    } finally {
-      setOtpLoading(false);
-    }
+    const err = await verifyLoginOtp(phone, otp);
+    setOtpLoading(false);
+    if (err) { setOtpError(err); return; }
+    router.push('/');
   }
 
   function switchMethod(next: 'password' | 'otp') {
@@ -200,10 +157,6 @@ export default function LoginPage() {
                 </p>
               </div>
             </form>
-          ) : !firebaseConfigured ? (
-            <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#c00', marginBottom: 24 }}>
-              Phone login isn&apos;t set up yet.
-            </p>
           ) : otpStep === 'phone' ? (
             <form onSubmit={handleSendOtp}>
               <div style={{ marginBottom: 28 }}>

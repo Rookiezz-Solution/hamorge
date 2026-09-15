@@ -17,7 +17,8 @@ interface AuthContextType {
   register: (data: RegisterData) => Promise<string | null>;
   logout: () => void;
   forgotPassword: (email: string) => Promise<string | null>;
-  verifyFirebasePhoneLogin: (idToken: string) => Promise<string | null>;
+  sendLoginOtp: (phone: string) => Promise<string | null>;
+  verifyLoginOtp: (phone: string, otp: string) => Promise<string | null>;
 }
 
 interface RegisterData {
@@ -26,11 +27,11 @@ interface RegisterData {
   email: string;
   phone: string;
   password: string;
-  /** Firebase ID token from a completed phone OTP verification — the backend
-   *  re-verifies this and checks it matches `phone` before creating the account.
-   *  Required whenever `phone` is non-empty; omit both together (e.g. the
-   *  CheckoutGate quick-registration path, which never collects a phone). */
-  firebaseIdToken?: string;
+  /** The MSG91 code sent to `phone` — the backend re-verifies it with MSG91
+   *  before creating the account. Required whenever `phone` is non-empty;
+   *  omit both together (e.g. the CheckoutGate quick-registration path,
+   *  which never collects a phone). */
+  otp?: string;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -89,21 +90,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null;
   }
 
-  async function verifyFirebasePhoneLogin(idToken: string): Promise<string | null> {
-    const res = await fetch('/api/auth/firebase-verify', {
+  async function sendLoginOtp(phone: string): Promise<string | null> {
+    const res = await fetch('/api/auth/otp/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idToken }),
+      body: JSON.stringify({ phone }),
     });
     const data = await res.json();
-    if (!res.ok) return data.error ?? 'Could not verify phone number.';
+    if (!res.ok) return data.error ?? 'Could not send OTP.';
+    return null;
+  }
+
+  async function verifyLoginOtp(phone: string, otp: string): Promise<string | null> {
+    const res = await fetch('/api/auth/otp/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, otp }),
+    });
+    const data = await res.json();
+    if (!res.ok) return data.error ?? 'Invalid or expired OTP.';
     setUser(data);
     localStorage.setItem('hamorge_user', JSON.stringify(data));
     return null;
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, forgotPassword, verifyFirebasePhoneLogin }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, forgotPassword, sendLoginOtp, verifyLoginOtp }}>
       {children}
     </AuthContext.Provider>
   );

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyFirebaseIdToken } from '@/lib/firebase-admin';
+import { verifyOtp } from '@/lib/msg91';
 
 const WC_URL = process.env.NEXT_PUBLIC_WC_API_URL!;
 const KEY = process.env.WC_CONSUMER_KEY!;
@@ -10,7 +10,7 @@ function wcAuthHeader() {
   return { Authorization: `Basic ${token}` };
 }
 
-/** Compares by last 10 digits so a stored "+91 98765 43210" matches Firebase's "+919876543210". */
+/** Compares by last 10 digits so a stored "+91 98765 43210" matches a typed "9876543210". */
 function normalizePhone(p: string): string {
   return p.replace(/\D/g, '').slice(-10);
 }
@@ -25,19 +25,22 @@ interface WCCustomer {
 
 export async function POST(req: NextRequest) {
   try {
-    const { idToken } = await req.json();
-    if (!idToken) {
-      return NextResponse.json({ error: 'Missing sign-in token.' }, { status: 400 });
+    const { phone, otp } = await req.json();
+
+    if (!phone || !otp) {
+      return NextResponse.json({ error: 'Phone and OTP are required.' }, { status: 400 });
     }
 
-    // Never trust a phone number the client claims — only what Firebase itself
-    // has cryptographically confirmed via a completed SMS verification.
-    const { phoneNumber } = await verifyFirebaseIdToken(idToken);
-    const targetPhone = normalizePhone(phoneNumber);
+    const result = await verifyOtp(phone, otp);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error ?? 'Invalid or expired OTP.' }, { status: 400 });
+    }
 
-    // WooCommerce's /customers search doesn't support filtering by phone —
-    // same pragmatic "fetch and filter" approach used elsewhere in this app
-    // (e.g. /api/orders for guest-order lookups by email).
+    const targetPhone = normalizePhone(phone);
+
+    // WooCommerce's /customers search only matches username/email/display name,
+    // not billing phone — same pragmatic "fetch and filter" approach already
+    // used in /api/orders for guest-order lookups by email.
     const wcRes = await fetch(`${WC_URL}/customers?per_page=100&orderby=registered_date&order=desc`, {
       headers: wcAuthHeader(),
       cache: 'no-store',
@@ -63,8 +66,7 @@ export async function POST(req: NextRequest) {
       lastName: customer.last_name,
       wcId: customer.id,
     });
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Server error. Please try again.';
-    return NextResponse.json({ error: message }, { status: 401 });
+  } catch {
+    return NextResponse.json({ error: 'Server error. Please try again.' }, { status: 500 });
   }
 }
