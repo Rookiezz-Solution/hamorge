@@ -248,6 +248,15 @@ function CheckoutPage() {
       payment_method: paymentMethod,
       payment_method_title: paymentMethod === 'cod' ? 'Cash on Delivery' : 'Razorpay',
       set_paid: false,
+      // COD orders created via the REST API default to "pending" (WooCommerce's
+      // generic new-order status) since there's no payment gateway class running
+      // to promote them the way a native checkout flow would. That's wrong for
+      // COD specifically — the order IS confirmed, payment just happens at the
+      // door — and it's why Shiprocket (and any other status-triggered
+      // automation) never saw these orders: they only ever fire on "processing".
+      // Razorpay doesn't need this — set_paid:true (set after verification, see
+      // /api/razorpay/verify) already makes WooCommerce auto-transition it.
+      ...(paymentMethod === 'cod' ? { status: 'processing' } : {}),
       ...(user?.wcId ? { customer_id: user.wcId } : {}),
       billing: {
         first_name: form.firstName,
