@@ -26,6 +26,11 @@ interface RegisterData {
   email: string;
   phone: string;
   password: string;
+  /** Firebase ID token from a completed phone OTP verification — the backend
+   *  re-verifies this and checks it matches `phone` before creating the account.
+   *  Required whenever `phone` is non-empty; omit both together (e.g. the
+   *  CheckoutGate quick-registration path, which never collects a phone). */
+  firebaseIdToken?: string;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);

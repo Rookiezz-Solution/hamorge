@@ -1,9 +1,22 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
+import {
+  createRecaptchaVerifier, sendFirebaseOtp, firebaseConfigured, type ConfirmationResult,
+} from '@/lib/firebase-client';
+import type { RecaptchaVerifier } from 'firebase/auth';
+
+/** Firebase's own error codes are prefixed like "auth/invalid-phone-number" — map the common ones to plain copy. */
+function friendlyFirebaseError(message: string): string {
+  if (message.includes('invalid-phone-number')) return 'Enter a valid 10-digit phone number.';
+  if (message.includes('too-many-requests')) return 'Too many attempts. Please try again later.';
+  if (message.includes('invalid-verification-code') || message.includes('code-expired')) return 'Incorrect or expired code.';
+  if (message.includes('quota-exceeded')) return 'SMS limit reached. Please try again later.';
+  return message;
+}
 
 export default function RegisterPage() {
   const { register } = useAuth();
@@ -20,23 +33,76 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
+  // Phone verification gate — the account isn't created until this passes.
+  // 'form' = filling in details, 'otp' = code sent, awaiting verification.
+  const [step, setStep] = useState<'form' | 'otp'>('form');
+  const [otp, setOtp] = useState('');
+  const [otpLoading, setOtpLoading] = useState(false);
+  const [otpError, setOtpError] = useState('');
+  const [otpSentMsg, setOtpSentMsg] = useState('');
+
+  const recaptchaRef = useRef<RecaptchaVerifier | null>(null);
+  const confirmationRef = useRef<ConfirmationResult | null>(null);
+
+  useEffect(() => {
+    return () => { recaptchaRef.current?.clear(); recaptchaRef.current = null; };
+  }, []);
+
   const inputStyle: React.CSSProperties = {
     width: '100%', border: 'none', borderBottom: '1px solid #000',
     fontFamily: 'var(--font-inter)', fontSize: 12, letterSpacing: '0.08em',
     color: '#000', padding: '8px 0', outline: 'none', background: 'transparent',
   };
 
+  // Step 1: validate the form, then send the phone OTP — the account itself
+  // isn't created here, only once the code is verified (see handleVerifyOtp).
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!agreed) { setError('Please accept the Privacy Policy to continue.'); return; }
     if (password !== confirmPassword) { setError('Passwords do not match.'); return; }
+    if (!/^\d{10}$/.test(phone)) { setError('Enter a valid 10-digit phone number.'); return; }
+    if (!firebaseConfigured) { setError('Phone verification is not set up yet.'); return; }
+
     setLoading(true);
     setError('');
-    const err = await register({ firstName, lastName, email, phone, password });
-    setLoading(false);
-    if (err) { setError(err); return; }
-    setSuccess(true);
-    setTimeout(() => router.push('/'), 2000);
+    try {
+      if (!recaptchaRef.current) {
+        recaptchaRef.current = createRecaptchaVerifier('firebase-recaptcha-container');
+      }
+      confirmationRef.current = await sendFirebaseOtp(`+91${phone}`, recaptchaRef.current);
+      setStep('otp');
+      setOtpSentMsg(`Code sent to +91${phone}.`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Could not send the code. Please try again.';
+      setError(friendlyFirebaseError(message));
+      recaptchaRef.current?.clear();
+      recaptchaRef.current = null;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Step 2: confirm the code, then actually create the account with the
+  // resulting Firebase ID token — the backend re-verifies it matches `phone`.
+  async function handleVerifyOtp(e: React.FormEvent) {
+    e.preventDefault();
+    setOtpLoading(true);
+    setOtpError('');
+    try {
+      if (!confirmationRef.current) throw new Error('Please request a new code.');
+      const result = await confirmationRef.current.confirm(otp);
+      const firebaseIdToken = await result.user.getIdToken();
+
+      const err = await register({ firstName, lastName, email, phone, password, firebaseIdToken });
+      if (err) { setOtpError(err); return; }
+      setSuccess(true);
+      setTimeout(() => router.push('/'), 2000);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'Invalid or expired code.';
+      setOtpError(friendlyFirebaseError(message));
+    } finally {
+      setOtpLoading(false);
+    }
   }
 
   if (success) {
@@ -49,6 +115,58 @@ export default function RegisterPage() {
           <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#555' }}>
             A welcome email has been sent to <strong>{email}</strong>. Redirecting you now…
           </p>
+        </div>
+      </main>
+    );
+  }
+
+  if (step === 'otp') {
+    return (
+      <main style={{ paddingTop: 'clamp(80px, 18vw, 140px)', minHeight: '100vh', background: '#fff' }}>
+        <div style={{ paddingLeft: '4%', paddingRight: '4%', paddingBottom: 80 }}>
+
+          <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', fontWeight: 400, letterSpacing: '0.10em', color: '#000', marginBottom: 40 }}>
+            VERIFY YOUR PHONE
+          </p>
+
+          <form onSubmit={handleVerifyOtp}>
+            {otpSentMsg && (
+              <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#555', marginBottom: 28 }}>{otpSentMsg}</p>
+            )}
+
+            <div style={{ marginBottom: 20 }}>
+              <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', letterSpacing: '0.10em', color: '#000', marginBottom: 10 }}>ENTER OTP</p>
+              <input
+                type="text" inputMode="numeric" required autoFocus placeholder="6-digit code"
+                value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                style={inputStyle}
+              />
+            </div>
+
+            <p
+              onClick={() => { setStep('form'); setOtp(''); setOtpError(''); setOtpSentMsg(''); }}
+              style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#000', letterSpacing: '0.08em', marginBottom: 20, cursor: 'pointer', textDecoration: 'underline', display: 'inline-block' }}
+            >
+              CHANGE NUMBER / RESEND
+            </p>
+
+            {otpError && (
+              <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#c00', marginBottom: 16 }}>{otpError}</p>
+            )}
+
+            <button
+              type="submit"
+              disabled={otpLoading || otp.length !== 6}
+              style={{
+                width: 260, height: 64, border: '1px solid #000', background: otpLoading ? '#f5f5f5' : '#fff',
+                fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', fontWeight: 400,
+                letterSpacing: '0.12em', color: otp.length === 6 ? '#000' : '#bbb',
+                cursor: otpLoading || otp.length !== 6 ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {otpLoading ? 'VERIFYING…' : 'VERIFY & CREATE ACCOUNT'}
+            </button>
+          </form>
         </div>
       </main>
     );
@@ -105,15 +223,16 @@ export default function RegisterPage() {
             </p>
             <div style={{ display: 'flex', gap: 16, alignItems: 'flex-end' }}>
               <div style={{ width: 80 }}>
+                {/* Fixed, not editable — the OTP flow assumes +91 throughout. */}
                 <input
-                  type="text" defaultValue="+91"
-                  style={{ ...inputStyle, textAlign: 'center' }}
+                  type="text" value="+91" readOnly
+                  style={{ ...inputStyle, textAlign: 'center', color: '#888' }}
                 />
               </div>
               <div style={{ flex: 1 }}>
                 <input
-                  type="tel" placeholder="TELEPHONE" value={phone}
-                  onChange={e => setPhone(e.target.value)} style={inputStyle}
+                  type="tel" inputMode="numeric" placeholder="TELEPHONE" value={phone}
+                  onChange={e => setPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} style={inputStyle}
                 />
               </div>
             </div>
@@ -135,6 +254,9 @@ export default function RegisterPage() {
             </p>
           </div>
 
+          {/* Required by Firebase Phone Auth as its bot-abuse check — invisible in practice. */}
+          <div id="firebase-recaptcha-container" />
+
           {error && (
             <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#c00', marginBottom: 16 }}>{error}</p>
           )}
@@ -148,7 +270,7 @@ export default function RegisterPage() {
               letterSpacing: '0.12em', color: '#000', cursor: loading ? 'not-allowed' : 'pointer',
             }}
           >
-            {loading ? 'CREATING ACCOUNT…' : 'CREATE ACCOUNT'}
+            {loading ? 'SENDING CODE…' : 'CONTINUE'}
           </button>
 
           <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#555', marginTop: 20 }}>
