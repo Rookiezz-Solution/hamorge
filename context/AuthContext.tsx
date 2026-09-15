@@ -17,6 +17,7 @@ interface AuthContextType {
   register: (data: RegisterData) => Promise<string | null>;
   logout: () => void;
   forgotPassword: (email: string) => Promise<string | null>;
+  verifyFirebasePhoneLogin: (idToken: string) => Promise<string | null>;
 }
 
 interface RegisterData {
@@ -83,8 +84,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null;
   }
 
+  async function verifyFirebasePhoneLogin(idToken: string): Promise<string | null> {
+    const res = await fetch('/api/auth/firebase-verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    });
+    const data = await res.json();
+    if (!res.ok) return data.error ?? 'Could not verify phone number.';
+    setUser(data);
+    localStorage.setItem('hamorge_user', JSON.stringify(data));
+    return null;
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, forgotPassword }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, forgotPassword, verifyFirebasePhoneLogin }}>
       {children}
     </AuthContext.Provider>
   );
