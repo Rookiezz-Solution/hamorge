@@ -32,14 +32,40 @@ export function getFirebaseAuth() {
   return getAuth(getFirebaseApp());
 }
 
+const RECAPTCHA_CONTAINER_ID = 'firebase-recaptcha-container';
+
 /**
- * Mounts an invisible reCAPTCHA bound to the given container id. Firebase
+ * Mounts an invisible reCAPTCHA and returns a fresh verifier. Firebase
  * requires one of these per phone-auth attempt as its bot-abuse check — it's
  * invisible in practice (no puzzle shown) unless Firebase's risk scoring
  * flags the attempt as suspicious.
+ *
+ * The container is created and destroyed here, imperatively, appended
+ * directly to <body> — deliberately kept OUTSIDE React's render tree rather
+ * than referencing a div from JSX. Two real problems forced this:
+ *  1. Google's reCAPTCHA JS tags the container *element itself* as already
+ *     used once rendered — clearing innerHTML, or even calling
+ *     RecaptchaVerifier.clear(), isn't enough to stop a retry from throwing
+ *     "reCAPTCHA has already been rendered in this element".
+ *  2. Swapping in a fresh element for one React rendered (replaceChild)
+ *     leaves React's fiber holding a stale reference to the now-detached old
+ *     node — its eventual unmount then throws trying to remove a node that's
+ *     no longer anyone's child.
+ * Owning the whole element's lifecycle here avoids both: nothing but this
+ * function ever creates, reads, or removes it.
  */
-export function createRecaptchaVerifier(containerId: string): RecaptchaVerifier {
-  return new RecaptchaVerifier(getFirebaseAuth(), containerId, { size: 'invisible' });
+export function createRecaptchaVerifier(previous?: RecaptchaVerifier | null): RecaptchaVerifier {
+  previous?.clear();
+  document.getElementById(RECAPTCHA_CONTAINER_ID)?.remove();
+  const container = document.createElement('div');
+  container.id = RECAPTCHA_CONTAINER_ID;
+  document.body.appendChild(container);
+  return new RecaptchaVerifier(getFirebaseAuth(), RECAPTCHA_CONTAINER_ID, { size: 'invisible' });
+}
+
+/** Removes the reCAPTCHA container, if one exists. Call on unmount alongside clearing the verifier. */
+export function removeRecaptchaContainer(): void {
+  document.getElementById(RECAPTCHA_CONTAINER_ID)?.remove();
 }
 
 export async function sendFirebaseOtp(

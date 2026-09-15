@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
-  createRecaptchaVerifier, sendFirebaseOtp, firebaseConfigured, type ConfirmationResult,
+  createRecaptchaVerifier, removeRecaptchaContainer, sendFirebaseOtp, firebaseConfigured, type ConfirmationResult,
 } from '@/lib/firebase-client';
 import type { RecaptchaVerifier } from 'firebase/auth';
 
@@ -45,7 +45,7 @@ export default function RegisterPage() {
   const confirmationRef = useRef<ConfirmationResult | null>(null);
 
   useEffect(() => {
-    return () => { recaptchaRef.current?.clear(); recaptchaRef.current = null; };
+    return () => { recaptchaRef.current?.clear(); recaptchaRef.current = null; removeRecaptchaContainer(); };
   }, []);
 
   const inputStyle: React.CSSProperties = {
@@ -66,9 +66,7 @@ export default function RegisterPage() {
     setLoading(true);
     setError('');
     try {
-      if (!recaptchaRef.current) {
-        recaptchaRef.current = createRecaptchaVerifier('firebase-recaptcha-container');
-      }
+      recaptchaRef.current = createRecaptchaVerifier(recaptchaRef.current);
       confirmationRef.current = await sendFirebaseOtp(`+91${phone}`, recaptchaRef.current);
       setStep('otp');
       setOtpSentMsg(`Code sent to +91${phone}.`);
@@ -253,9 +251,6 @@ export default function RegisterPage() {
               <Link href="/privacy" style={{ color: '#000', textDecoration: 'underline' }}>Privacy Policy</Link>
             </p>
           </div>
-
-          {/* Required by Firebase Phone Auth as its bot-abuse check — invisible in practice. */}
-          <div id="firebase-recaptcha-container" />
 
           {error && (
             <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#c00', marginBottom: 16 }}>{error}</p>

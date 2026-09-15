@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 import {
-  createRecaptchaVerifier, sendFirebaseOtp, firebaseConfigured, type ConfirmationResult,
+  createRecaptchaVerifier, removeRecaptchaContainer, sendFirebaseOtp, firebaseConfigured, type ConfirmationResult,
 } from '@/lib/firebase-client';
 import type { RecaptchaVerifier } from 'firebase/auth';
 
@@ -45,7 +45,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     // Tear down the reCAPTCHA widget on unmount so a stale instance never lingers.
-    return () => { recaptchaRef.current?.clear(); recaptchaRef.current = null; };
+    return () => { recaptchaRef.current?.clear(); recaptchaRef.current = null; removeRecaptchaContainer(); };
   }, []);
 
   const [forgotOpen, setForgotOpen] = useState(false);
@@ -76,9 +76,7 @@ export default function LoginPage() {
     setOtpError('');
     setOtpSentMsg('');
     try {
-      if (!recaptchaRef.current) {
-        recaptchaRef.current = createRecaptchaVerifier('firebase-recaptcha-container');
-      }
+      recaptchaRef.current = createRecaptchaVerifier(recaptchaRef.current);
       const e164 = `+91${phone}`;
       confirmationRef.current = await sendFirebaseOtp(e164, recaptchaRef.current);
       setOtpStep('code');
@@ -220,8 +218,6 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {/* Required by Firebase Phone Auth as its bot-abuse check — invisible in practice. */}
-              <div id="firebase-recaptcha-container" />
 
               {otpError && (
                 <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#c00', marginBottom: 16 }}>{otpError}</p>
