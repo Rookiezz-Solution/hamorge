@@ -19,6 +19,7 @@ interface AuthContextType {
   forgotPassword: (email: string) => Promise<string | null>;
   sendLoginOtp: (phone: string) => Promise<string | null>;
   verifyLoginOtp: (phone: string, otp: string) => Promise<string | null>;
+  sendRegisterOtp: (email: string) => Promise<string | null>;
 }
 
 interface RegisterData {
@@ -27,10 +28,11 @@ interface RegisterData {
   email: string;
   phone: string;
   password: string;
-  /** The MSG91 code sent to `phone` — the backend re-verifies it with MSG91
-   *  before creating the account. Required whenever `phone` is non-empty;
-   *  omit both together (e.g. the CheckoutGate quick-registration path,
-   *  which never collects a phone). */
+  /** The code sent to `email` via sendRegisterOtp — the backend re-verifies
+   *  it before creating the account. Interim: verifies by email rather than
+   *  phone while MSG91's DLT registration is pending; required whenever
+   *  `phone` is non-empty, omit both together (e.g. the CheckoutGate
+   *  quick-registration path, which never collects a phone). */
   otp?: string;
 }
 
@@ -114,8 +116,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return null;
   }
 
+  async function sendRegisterOtp(email: string): Promise<string | null> {
+    const res = await fetch('/api/auth/register-otp/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    });
+    const data = await res.json();
+    if (!res.ok) return data.error ?? 'Could not send the code.';
+    return null;
+  }
+
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, forgotPassword, sendLoginOtp, verifyLoginOtp }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, forgotPassword, sendLoginOtp, verifyLoginOtp, sendRegisterOtp }}>
       {children}
     </AuthContext.Provider>
   );

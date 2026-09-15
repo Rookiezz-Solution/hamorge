@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
 export default function RegisterPage() {
-  const { register, sendLoginOtp } = useAuth();
+  const { register, sendRegisterOtp } = useAuth();
   const router = useRouter();
 
   const [firstName, setFirstName] = useState('');
@@ -34,10 +34,15 @@ export default function RegisterPage() {
     color: '#000', padding: '8px 0', outline: 'none', background: 'transparent',
   };
 
-  // Step 1: validate the form, then send the phone OTP (via MSG91) — the
-  // account itself isn't created here, only once the code is verified
-  // (see handleVerifyOtp), and MSG91's verify call happens server-side,
-  // atomically with account creation, in /api/auth/register.
+  // Step 1: validate the form, then send a verification code to the email
+  // address — the account itself isn't created here, only once the code is
+  // verified (see handleVerifyOtp), atomically with account creation, in
+  // /api/auth/register.
+  //
+  // Interim: verifying by email rather than phone/SMS while MSG91's DLT
+  // registration (required for transactional SMS to Indian numbers,
+  // regardless of provider) is pending — phone is still collected below and
+  // saved as before, just not itself verified yet.
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!agreed) { setError('Please accept the Privacy Policy to continue.'); return; }
@@ -46,15 +51,15 @@ export default function RegisterPage() {
 
     setLoading(true);
     setError('');
-    const err = await sendLoginOtp(phone);
+    const err = await sendRegisterOtp(email);
     setLoading(false);
     if (err) { setError(err); return; }
     setStep('otp');
-    setOtpSentMsg(`Code sent to +91${phone}.`);
+    setOtpSentMsg(`Code sent to ${email}.`);
   }
 
   // Step 2: submit the code together with the form details — the account is
-  // created only if MSG91 confirms the code server-side (see the route).
+  // created only if the code is confirmed server-side (see the route).
   async function handleVerifyOtp(e: React.FormEvent) {
     e.preventDefault();
     setOtpLoading(true);
@@ -87,7 +92,7 @@ export default function RegisterPage() {
         <div style={{ paddingLeft: '4%', paddingRight: '4%', paddingBottom: 80 }}>
 
           <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', fontWeight: 400, letterSpacing: '0.10em', color: '#000', marginBottom: 40 }}>
-            VERIFY YOUR PHONE
+            VERIFY YOUR EMAIL
           </p>
 
           <form onSubmit={handleVerifyOtp}>
@@ -108,7 +113,7 @@ export default function RegisterPage() {
               onClick={() => { setStep('form'); setOtp(''); setOtpError(''); setOtpSentMsg(''); }}
               style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#000', letterSpacing: '0.08em', marginBottom: 20, cursor: 'pointer', textDecoration: 'underline', display: 'inline-block' }}
             >
-              CHANGE NUMBER / RESEND
+              CHANGE DETAILS / RESEND
             </p>
 
             {otpError && (
@@ -200,7 +205,7 @@ export default function RegisterPage() {
           </div>
 
           <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#555', marginBottom: 32, marginTop: 16 }}>
-            We will send you an SMS to verify your phone number
+            We will send a verification code to your email to confirm your account
           </p>
 
           {/* Checkbox */}
