@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '@/context/AuthContext';
 
 export default function RegisterPage() {
-  const { register, sendRegisterOtp } = useAuth();
+  const { register } = useAuth();
   const router = useRouter();
 
   const [firstName, setFirstName] = useState('');
@@ -20,29 +20,12 @@ export default function RegisterPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
 
-  // Phone verification gate — the account isn't created until this passes.
-  // 'form' = filling in details, 'otp' = code sent, awaiting verification.
-  const [step, setStep] = useState<'form' | 'otp'>('form');
-  const [otp, setOtp] = useState('');
-  const [otpLoading, setOtpLoading] = useState(false);
-  const [otpError, setOtpError] = useState('');
-  const [otpSentMsg, setOtpSentMsg] = useState('');
-
   const inputStyle: React.CSSProperties = {
     width: '100%', border: 'none', borderBottom: '1px solid #000',
     fontFamily: 'var(--font-inter)', fontSize: 12, letterSpacing: '0.08em',
     color: '#000', padding: '8px 0', outline: 'none', background: 'transparent',
   };
 
-  // Step 1: validate the form, then send a verification code to the email
-  // address — the account itself isn't created here, only once the code is
-  // verified (see handleVerifyOtp), atomically with account creation, in
-  // /api/auth/register.
-  //
-  // Interim: verifying by email rather than phone/SMS while MSG91's DLT
-  // registration (required for transactional SMS to Indian numbers,
-  // regardless of provider) is pending — phone is still collected below and
-  // saved as before, just not itself verified yet.
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!agreed) { setError('Please accept the Privacy Policy to continue.'); return; }
@@ -51,22 +34,9 @@ export default function RegisterPage() {
 
     setLoading(true);
     setError('');
-    const err = await sendRegisterOtp(email);
+    const err = await register({ firstName, lastName, email, phone, password });
     setLoading(false);
     if (err) { setError(err); return; }
-    setStep('otp');
-    setOtpSentMsg(`Code sent to ${email}.`);
-  }
-
-  // Step 2: submit the code together with the form details — the account is
-  // created only if the code is confirmed server-side (see the route).
-  async function handleVerifyOtp(e: React.FormEvent) {
-    e.preventDefault();
-    setOtpLoading(true);
-    setOtpError('');
-    const err = await register({ firstName, lastName, email, phone, password, otp });
-    setOtpLoading(false);
-    if (err) { setOtpError(err); return; }
     setSuccess(true);
     setTimeout(() => router.push('/'), 2000);
   }
@@ -81,58 +51,6 @@ export default function RegisterPage() {
           <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#555' }}>
             A welcome email has been sent to <strong>{email}</strong>. Redirecting you now…
           </p>
-        </div>
-      </main>
-    );
-  }
-
-  if (step === 'otp') {
-    return (
-      <main style={{ paddingTop: 'clamp(80px, 18vw, 140px)', minHeight: '100vh', background: '#fff' }}>
-        <div style={{ paddingLeft: '4%', paddingRight: '4%', paddingBottom: 80 }}>
-
-          <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', fontWeight: 400, letterSpacing: '0.10em', color: '#000', marginBottom: 40 }}>
-            VERIFY YOUR EMAIL
-          </p>
-
-          <form onSubmit={handleVerifyOtp}>
-            {otpSentMsg && (
-              <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#555', marginBottom: 28 }}>{otpSentMsg}</p>
-            )}
-
-            <div style={{ marginBottom: 20 }}>
-              <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', letterSpacing: '0.10em', color: '#000', marginBottom: 10 }}>ENTER OTP</p>
-              <input
-                type="text" inputMode="numeric" required autoFocus placeholder="6-digit code"
-                value={otp} onChange={e => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                style={inputStyle}
-              />
-            </div>
-
-            <p
-              onClick={() => { setStep('form'); setOtp(''); setOtpError(''); setOtpSentMsg(''); }}
-              style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#000', letterSpacing: '0.08em', marginBottom: 20, cursor: 'pointer', textDecoration: 'underline', display: 'inline-block' }}
-            >
-              CHANGE DETAILS / RESEND
-            </p>
-
-            {otpError && (
-              <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#c00', marginBottom: 16 }}>{otpError}</p>
-            )}
-
-            <button
-              type="submit"
-              disabled={otpLoading || otp.length !== 6}
-              style={{
-                width: 260, height: 64, border: '1px solid #000', background: otpLoading ? '#f5f5f5' : '#fff',
-                fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', fontWeight: 400,
-                letterSpacing: '0.12em', color: otp.length === 6 ? '#000' : '#bbb',
-                cursor: otpLoading || otp.length !== 6 ? 'not-allowed' : 'pointer',
-              }}
-            >
-              {otpLoading ? 'VERIFYING…' : 'VERIFY & CREATE ACCOUNT'}
-            </button>
-          </form>
         </div>
       </main>
     );
@@ -204,10 +122,6 @@ export default function RegisterPage() {
             </div>
           </div>
 
-          <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#555', marginBottom: 32, marginTop: 16 }}>
-            We will send a verification code to your email to confirm your account
-          </p>
-
           {/* Checkbox */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
             <input
@@ -233,7 +147,7 @@ export default function RegisterPage() {
               letterSpacing: '0.12em', color: '#000', cursor: loading ? 'not-allowed' : 'pointer',
             }}
           >
-            {loading ? 'SENDING CODE…' : 'CONTINUE'}
+            {loading ? 'CREATING ACCOUNT…' : 'CONTINUE'}
           </button>
 
           <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#555', marginTop: 20 }}>
