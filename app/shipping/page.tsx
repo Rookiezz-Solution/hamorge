@@ -18,12 +18,12 @@ export default function ShippingPage() {
         <p style={S.title}>Shipping</p>
         <p style={S.body}>
           We ship all orders within 24-48 hours<br />
-          Delivery usually takes 3- 5 working days, depending on your location
+          Delivery usually takes 5-7 working days, depending on your location
         </p>
 
         <p style={S.title}>Retrun policy</p>
         <p style={S.body}>
-          We offer a 30 days return policy from the date of delivery. You can retrun your product if, you received a damaged or defective item, The size is not fitting, The product delivered is wrong (different design/colour)
+          We offer a 15 days return policy from the date of delivery. You can retrun your product if, you received a damaged or defective item, The size is not fitting, The product delivered is wrong (different design/colour)
         </p>
 
         <p style={S.title}>To be eligible for a return</p>
@@ -43,7 +43,7 @@ export default function ShippingPage() {
 
         <p style={S.title}>Exchange</p>
         <p style={S.body}>
-          If you want to change size/design, we offer free exchange within 30 days ( one time only)
+          If you want to change size/design, we offer free exchange within 15 days ( one time only)
         </p>
 
       </div>

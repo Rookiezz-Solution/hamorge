@@ -296,7 +296,7 @@ export default function ProductContent({ slug, wcProduct, suggested, wcReviews, 
       <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#444', lineHeight: 1.65, marginBottom: 20 }}>Delivery in 5 to 7 working days</p>
       <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', fontWeight: 600, marginBottom: 6 }}>EXCHANGE AND RETURNS</p>
       <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', color: '#444', lineHeight: 1.65 }}>
-        You have 30 days from the shipping date to return your purchase from Ham Orge.com. For more details, please refer to our{' '}
+        You have 15 days from the shipping date to return your purchase from Ham Orge.com. For more details, please refer to our{' '}
         <Link href="/shipping" style={{ color: '#000', textDecoration: 'underline' }}>Return, Shipping &amp; Refund Policy</Link>
       </p>
     </div>
