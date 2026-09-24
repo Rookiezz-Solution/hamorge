@@ -34,14 +34,14 @@ function BackButton({ onClick }: { onClick: () => void }) {
 }
 
 export default function CheckoutGate({ onClose, onAuth, onGuest }: Props) {
-  const { login, register, forgotPassword } = useAuth();
+  const { login, register, sendForgotPasswordOtp, resetPassword } = useAuth();
   const router = useRouter();
   const [view, setView] = useState<View>('choose');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   // Login fields
-  const [loginEmail, setLoginEmail] = useState('');
+  const [loginIdentifier, setLoginIdentifier] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
 
   // Register fields
@@ -51,10 +51,15 @@ export default function CheckoutGate({ onClose, onAuth, onGuest }: Props) {
   const [regPassword, setRegPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  // Forgot password fields
-  const [forgotEmail, setForgotEmail] = useState('');
+  // Forgot password fields — 'phone' = enter registered number, 'reset' = code sent, enter it plus a new password.
+  const [forgotStep, setForgotStep] = useState<'phone' | 'reset'>('phone');
+  const [forgotPhone, setForgotPhone] = useState('');
+  const [forgotOtp, setForgotOtp] = useState('');
+  const [forgotOtpToken, setForgotOtpToken] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
-  const [forgotMsg, setForgotMsg] = useState('');
+  const [forgotDone, setForgotDone] = useState(false);
 
   function switchTo(v: View) {
     setError('');
@@ -71,7 +76,7 @@ export default function CheckoutGate({ onClose, onAuth, onGuest }: Props) {
     e.preventDefault();
     setLoading(true);
     setError('');
-    const err = await login(loginEmail, loginPassword);
+    const err = await login(loginIdentifier, loginPassword);
     setLoading(false);
     if (err) { setError(err); return; }
     if (onAuth) { onAuth(); return; }
@@ -92,15 +97,38 @@ export default function CheckoutGate({ onClose, onAuth, onGuest }: Props) {
     router.push('/address');
   }
 
-  async function handleForgot(e: React.FormEvent) {
+  function openForgot() {
+    setForgotStep('phone');
+    setForgotPhone('');
+    setForgotOtp('');
+    setForgotOtpToken('');
+    setNewPassword('');
+    setConfirmNewPassword('');
+    setForgotDone(false);
+    setError('');
+    switchTo('forgot');
+  }
+
+  async function handleSendForgotOtp(e: React.FormEvent) {
     e.preventDefault();
     setForgotLoading(true);
     setError('');
-    setForgotMsg('');
-    const err = await forgotPassword(forgotEmail);
+    const { token, error: sendErr } = await sendForgotPasswordOtp(forgotPhone);
+    setForgotLoading(false);
+    if (sendErr || !token) { setError(sendErr ?? 'Could not send the code.'); return; }
+    setForgotOtpToken(token);
+    setForgotStep('reset');
+  }
+
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPassword !== confirmNewPassword) { setError('Passwords do not match.'); return; }
+    setForgotLoading(true);
+    setError('');
+    const err = await resetPassword(forgotPhone, forgotOtp, forgotOtpToken, newPassword);
     setForgotLoading(false);
     if (err) { setError(err); return; }
-    setForgotMsg(`Password reset email sent to ${forgotEmail}. Check your inbox.`);
+    setForgotDone(true);
   }
 
   return (
@@ -189,8 +217,8 @@ export default function CheckoutGate({ onClose, onAuth, onGuest }: Props) {
 
             <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
               <input
-                required type="email" placeholder="EMAIL" value={loginEmail}
-                onChange={e => setLoginEmail(e.target.value)} style={inputStyle}
+                required type="text" placeholder="EMAIL OR PHONE NUMBER" value={loginIdentifier}
+                onChange={e => setLoginIdentifier(e.target.value)} style={inputStyle}
               />
               <input
                 required type="password" placeholder="PASSWORD" value={loginPassword}
@@ -199,7 +227,7 @@ export default function CheckoutGate({ onClose, onAuth, onGuest }: Props) {
 
               <button
                 type="button"
-                onClick={() => { setForgotEmail(loginEmail); setForgotMsg(''); switchTo('forgot'); }}
+                onClick={openForgot}
                 style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-inter)', fontSize: 12, color: '#000', textDecoration: 'underline', alignSelf: 'flex-start' }}
               >
                 Forgot password?
@@ -243,13 +271,12 @@ export default function CheckoutGate({ onClose, onAuth, onGuest }: Props) {
             <p style={{ fontFamily: 'var(--font-inter)', fontSize: 12, fontWeight: 400, letterSpacing: '0.08em', color: '#000', marginBottom: 16 }}>
               RESET PASSWORD
             </p>
-            <p style={{ fontFamily: 'var(--font-inter)', fontSize: 12, color: '#555', marginBottom: 28, lineHeight: 1.6 }}>
-              Enter your email and we&apos;ll send you a link to reset your password.
-            </p>
 
-            {forgotMsg ? (
+            {forgotDone ? (
               <>
-                <p style={{ fontFamily: 'var(--font-inter)', fontSize: 12, color: '#000', marginBottom: 24 }}>{forgotMsg}</p>
+                <p style={{ fontFamily: 'var(--font-inter)', fontSize: 12, color: '#000', marginBottom: 24 }}>
+                  Password reset successfully. You can now log in with your new password.
+                </p>
                 <button
                   type="button"
                   onClick={() => switchTo('login')}
@@ -258,27 +285,76 @@ export default function CheckoutGate({ onClose, onAuth, onGuest }: Props) {
                   BACK TO LOG IN
                 </button>
               </>
-            ) : (
-              <form onSubmit={handleForgot} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-                <input
-                  required type="email" placeholder="EMAIL" value={forgotEmail}
-                  onChange={e => setForgotEmail(e.target.value)} style={inputStyle}
-                />
+            ) : forgotStep === 'phone' ? (
+              <form onSubmit={handleSendForgotOtp} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <p style={{ fontFamily: 'var(--font-inter)', fontSize: 12, color: '#555', lineHeight: 1.6 }}>
+                  Enter your registered phone number and we&apos;ll send you a verification code via WhatsApp.
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #ccc' }}>
+                  <span style={{ fontFamily: 'var(--font-inter)', fontSize: 12, color: '#555', padding: '10px 8px 10px 0' }}>+91</span>
+                  <input
+                    required type="tel" inputMode="numeric" placeholder="10-digit mobile number"
+                    value={forgotPhone} onChange={e => setForgotPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    style={{ ...inputStyle, border: 'none', padding: '10px 0' }}
+                  />
+                </div>
 
                 {error && (
                   <p style={{ fontFamily: 'var(--font-inter)', fontSize: 12, color: '#c00' }}>{error}</p>
                 )}
 
                 <button
-                  type="submit" disabled={forgotLoading}
+                  type="submit" disabled={forgotLoading || forgotPhone.length !== 10}
                   style={{
                     width: '100%', height: 52, background: forgotLoading ? '#f5f5f5' : '#fff',
                     border: '1px solid #000', fontFamily: 'var(--font-inter)', fontSize: 12,
                     letterSpacing: '0.14em', color: '#000',
-                    cursor: forgotLoading ? 'not-allowed' : 'pointer', marginTop: 4,
+                    cursor: forgotLoading || forgotPhone.length !== 10 ? 'not-allowed' : 'pointer', marginTop: 4,
                   }}
                 >
-                  {forgotLoading ? 'SENDING…' : 'SEND RESET LINK'}
+                  {forgotLoading ? 'SENDING…' : 'SEND CODE'}
+                </button>
+              </form>
+            ) : (
+              <form onSubmit={handleResetPassword} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <p style={{ fontFamily: 'var(--font-inter)', fontSize: 12, color: '#555', lineHeight: 1.6 }}>
+                  Code sent to +91 {forgotPhone} via WhatsApp.
+                </p>
+                <input
+                  required type="text" inputMode="numeric" placeholder="6-DIGIT CODE" value={forgotOtp}
+                  onChange={e => setForgotOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} style={inputStyle}
+                />
+                <input
+                  required type="password" placeholder="NEW PASSWORD" value={newPassword} minLength={8}
+                  onChange={e => setNewPassword(e.target.value)} style={inputStyle}
+                />
+                <input
+                  required type="password" placeholder="CONFIRM NEW PASSWORD" value={confirmNewPassword} minLength={8}
+                  onChange={e => setConfirmNewPassword(e.target.value)} style={inputStyle}
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setForgotStep('phone')}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-inter)', fontSize: 12, color: '#000', textDecoration: 'underline', alignSelf: 'flex-start' }}
+                >
+                  Change number / resend
+                </button>
+
+                {error && (
+                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: 12, color: '#c00' }}>{error}</p>
+                )}
+
+                <button
+                  type="submit" disabled={forgotLoading || forgotOtp.length !== 6}
+                  style={{
+                    width: '100%', height: 52, background: forgotLoading ? '#f5f5f5' : '#fff',
+                    border: '1px solid #000', fontFamily: 'var(--font-inter)', fontSize: 12,
+                    letterSpacing: '0.14em', color: '#000',
+                    cursor: forgotLoading || forgotOtp.length !== 6 ? 'not-allowed' : 'pointer', marginTop: 4,
+                  }}
+                >
+                  {forgotLoading ? 'RESETTING…' : 'RESET PASSWORD'}
                 </button>
               </form>
             )}

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { findUserByPhone } from '@/lib/find-user-by-phone';
 
 const WP_URL = process.env.NEXT_PUBLIC_WP_URL!;
 const WC_URL = process.env.NEXT_PUBLIC_WC_API_URL!;
@@ -7,10 +8,23 @@ const SECRET = process.env.WC_CONSUMER_SECRET!;
 
 export async function POST(req: NextRequest) {
   try {
-    const { email, password } = await req.json();
+    const { identifier, password } = await req.json();
 
-    if (!email || !password) {
-      return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 });
+    if (!identifier || !password) {
+      return NextResponse.json({ error: 'Email/phone and password are required.' }, { status: 400 });
+    }
+
+    // The account's actual WP username is always its email — a phone
+    // identifier needs resolving to that email first (see
+    // docs/wordpress-find-by-phone-snippet.php) before wp-login.php will
+    // recognize it.
+    let email = identifier;
+    if (!identifier.includes('@')) {
+      const user = await findUserByPhone(identifier);
+      if (!user) {
+        return NextResponse.json({ error: 'Invalid email/phone or password.' }, { status: 401 });
+      }
+      email = user.email;
     }
 
     const wcAuth = Buffer.from(`${KEY}:${SECRET}`).toString('base64');
@@ -44,7 +58,7 @@ export async function POST(req: NextRequest) {
 
     // WordPress redirects (3xx) on success; stays on login page (200) on failure
     if (wpRes.status !== 302 && wpRes.status !== 301) {
-      return NextResponse.json({ error: 'Invalid email or password.' }, { status: 401 });
+      return NextResponse.json({ error: 'Invalid email/phone or password.' }, { status: 401 });
     }
 
     let wcCustomer: Record<string, unknown> | null = null;

@@ -13,12 +13,12 @@ interface AuthUser {
 interface AuthContextType {
   user: AuthUser | null;
   loading: boolean;
-  login: (email: string, password: string) => Promise<string | null>;
+  login: (identifier: string, password: string) => Promise<string | null>;
   register: (data: RegisterData) => Promise<string | null>;
   logout: () => void;
-  forgotPassword: (email: string) => Promise<string | null>;
-  sendLoginOtp: (phone: string) => Promise<string | null>;
-  verifyLoginOtp: (phone: string, otp: string) => Promise<string | null>;
+  sendRegisterOtp: (phone: string) => Promise<{ token: string | null; error: string | null }>;
+  sendForgotPasswordOtp: (phone: string) => Promise<{ token: string | null; error: string | null }>;
+  resetPassword: (phone: string, otp: string, otpToken: string, password: string) => Promise<string | null>;
 }
 
 interface RegisterData {
@@ -27,6 +27,13 @@ interface RegisterData {
   email: string;
   phone: string;
   password: string;
+  /** The code sent to `phone` via sendRegisterOtp, plus the token it
+   *  returned — the backend re-verifies both before creating the account.
+   *  Required whenever `phone` is non-empty; omit all three together (e.g.
+   *  the CheckoutGate quick-registration path, which never collects a
+   *  phone). */
+  otp?: string;
+  otpToken?: string;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
@@ -43,11 +50,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(false);
   }, []);
 
-  async function login(email: string, password: string): Promise<string | null> {
+  async function login(identifier: string, password: string): Promise<string | null> {
     const res = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ identifier, password }),
     });
     const data = await res.json();
     if (!res.ok) return data.error ?? 'Login failed.';
@@ -74,43 +81,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem('hamorge_user');
   }
 
-  async function forgotPassword(email: string): Promise<string | null> {
-    const res = await fetch('/api/auth/forgot-password', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    });
-    const data = await res.json();
-    if (!res.ok) return data.error ?? 'Failed to send reset email.';
-    return null;
-  }
-
-  async function sendLoginOtp(phone: string): Promise<string | null> {
-    const res = await fetch('/api/auth/otp/send', {
+  async function sendRegisterOtp(phone: string): Promise<{ token: string | null; error: string | null }> {
+    const res = await fetch('/api/auth/whatsapp-otp/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ phone }),
     });
     const data = await res.json();
-    if (!res.ok) return data.error ?? 'Could not send OTP.';
-    return null;
+    if (!res.ok) return { token: null, error: data.error ?? 'Could not send the code.' };
+    return { token: data.token, error: null };
   }
 
-  async function verifyLoginOtp(phone: string, otp: string): Promise<string | null> {
-    const res = await fetch('/api/auth/otp/verify', {
+  async function sendForgotPasswordOtp(phone: string): Promise<{ token: string | null; error: string | null }> {
+    const res = await fetch('/api/auth/forgot-password/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone, otp }),
+      body: JSON.stringify({ phone }),
     });
     const data = await res.json();
-    if (!res.ok) return data.error ?? 'Invalid or expired OTP.';
-    setUser(data);
-    localStorage.setItem('hamorge_user', JSON.stringify(data));
+    if (!res.ok) return { token: null, error: data.error ?? 'Could not send the code.' };
+    return { token: data.token, error: null };
+  }
+
+  async function resetPassword(phone: string, otp: string, otpToken: string, password: string): Promise<string | null> {
+    const res = await fetch('/api/auth/forgot-password/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone, otp, otpToken, password }),
+    });
+    const data = await res.json();
+    if (!res.ok) return data.error ?? 'Could not reset the password.';
     return null;
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, forgotPassword, sendLoginOtp, verifyLoginOtp }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, sendRegisterOtp, sendForgotPasswordOtp, resetPassword }}>
       {children}
     </AuthContext.Provider>
   );
