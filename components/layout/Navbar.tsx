@@ -164,29 +164,20 @@ export default function Navbar({ categories = [] }: { categories?: { id: number;
                 </Link>
               </div>
 
-              {/* T-SHIRTS */}
+              {/* SHOP */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: 14, marginBottom: 40 }}>
                 <Link href="/shop" onClick={() => setMenuOpen(false)}
                   className="text-[10px] md:text-[12px]"
                   style={{ fontFamily: 'var(--font-inter)', fontWeight: 400, color: '#000', textDecoration: 'none', letterSpacing: '0.08em' }}>
-                  T-SHIRTS
+                  VIEW ALL
                 </Link>
-                {categories.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 14 }}>
-                    <Link href="/shop" onClick={() => setMenuOpen(false)}
-                      className="text-[10px] md:text-[12px]"
-                      style={{ fontFamily: 'var(--font-inter)', fontWeight: 400, color: '#555', textDecoration: 'none', letterSpacing: '0.08em' }}>
-                      VIEW ALL
-                    </Link>
-                    {categories.map(c => (
-                      <Link key={c.id} href={`/shop?category=${c.slug}`} onClick={() => setMenuOpen(false)}
-                        className="text-[10px] md:text-[12px]"
-                        style={{ fontFamily: 'var(--font-inter)', fontWeight: 400, color: '#555', textDecoration: 'none', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                        {c.name}
-                      </Link>
-                    ))}
-                  </div>
-                )}
+                {categories.map(c => (
+                  <Link key={c.id} href={`/shop?category=${c.slug}`} onClick={() => setMenuOpen(false)}
+                    className="text-[10px] md:text-[12px]"
+                    style={{ fontFamily: 'var(--font-inter)', fontWeight: 400, color: '#000', textDecoration: 'none', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                    {c.name}
+                  </Link>
+                ))}
               </div>
 
               {/* CUSTOMER SERVICE */}
