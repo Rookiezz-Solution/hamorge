@@ -106,14 +106,20 @@ export default function ShopContent({ initialProducts, categories = [] }: { init
             {[{ id: 0, name: 'View all', slug: null as string | null }, ...categories].map(c => {
               const active = c.slug === activeCategory;
               return (
-                <Link
+                // Filters client-side from the already-loaded products and updates the URL via
+                // history.pushState (Next syncs it into useSearchParams). Going through the router
+                // instead left the first "View all" click after a page load doing nothing.
+                <a
                   key={c.id}
                   href={c.slug ? `/shop?category=${c.slug}` : '/shop'}
-                  scroll={false}
-                  style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 10px)', fontWeight: active ? 700 : 400, letterSpacing: '0.08em', color: active ? '#000' : '#999', textTransform: 'uppercase', textDecoration: 'none' }}
+                  onClick={e => {
+                    e.preventDefault();
+                    window.history.pushState(null, '', c.slug ? `/shop?category=${c.slug}` : '/shop');
+                  }}
+                  style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 10px)', fontWeight: active ? 700 : 400, letterSpacing: '0.08em', color: active ? '#000' : '#999', textTransform: 'uppercase', textDecoration: 'none', cursor: 'pointer' }}
                 >
                   {c.name}
-                </Link>
+                </a>
               );
             })}
           </div>
