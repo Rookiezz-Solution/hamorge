@@ -13,8 +13,6 @@ interface Review { stars: number; date: string; text: string; }
 interface StaticProduct {
   name: string; price: string; description: string;
   images: string[]; sizes: string[];
-  measurementsCm: Record<string, Record<string, number>>;
-  measurementsIn: Record<string, Record<string, number>>;
 }
 
 /* WooCommerce review shape (from /products/reviews) */
@@ -28,21 +26,48 @@ function formatReviewDate(iso: string): string {
   return `${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 
-/* ─── Default measurements ───────────────────────────── */
-const DEFAULT_MEASUREMENTS_CM: Record<string, Record<string, number>> = {
+/* ─── Measurements ───────────────────────────────────── */
+type MeasurementTable = Record<string, Record<string, number>>;
+
+// Shown only for products that haven't had their own size chart entered yet.
+const DEFAULT_MEASUREMENTS_CM: MeasurementTable = {
   Chest: { S: 52, M: 54.5, L: 59.5, XL: 60 },
   'Front length': { S: 68, M: 69.5, L: 73, XL: 76.1 },
-  'Sleeve length': { S: 26.5, M: 26.5, L: 26.4, XL: 26.6 },
   'Back width': { S: 43.5, M: 47.7, L: 51, XL: 51.5 },
-  'Arm width': { S: 19.5, M: 19.3, L: 20.5, XL: 21 },
 };
-const DEFAULT_MEASUREMENTS_IN: Record<string, Record<string, number>> = {
-  Chest: { S: 20.6, M: 21.5, L: 23.5, XL: 23.6 },
-  'Front length': { S: 26.7, M: 27.4, L: 28.8, XL: 30 },
-  'Sleeve length': { S: 10.4, M: 10.4, L: 10.4, XL: 10.5 },
-  'Back width': { S: 17.1, M: 18.8, L: 20.1, XL: 20.3 },
-  'Arm width': { S: 7.7, M: 7.6, L: 8.1, XL: 8.3 },
-};
+
+// Per-product chart entered in the WooCommerce product editor
+// (docs/wordpress-size-chart-snippet.php) — stored in cm as JSON under the
+// `hamorge_size_chart` meta key. Rows left blank for every size are skipped.
+function parseSizeChart(wcProduct: Record<string, unknown> | null): MeasurementTable | null {
+  const meta = (wcProduct?.meta_data as { key: string; value: unknown }[] | undefined)
+    ?.find(m => m.key === 'hamorge_size_chart');
+  if (!meta?.value) return null;
+  try {
+    const raw = typeof meta.value === 'string' ? JSON.parse(meta.value) : meta.value;
+    const table: MeasurementTable = {};
+    for (const [area, vals] of Object.entries(raw as Record<string, Record<string, unknown>>)) {
+      const row: Record<string, number> = {};
+      for (const size of ['S', 'M', 'L', 'XL']) {
+        const n = parseFloat(String(vals?.[size] ?? ''));
+        if (!isNaN(n)) row[size] = n;
+      }
+      if (Object.keys(row).length > 0) table[area] = row;
+    }
+    return Object.keys(table).length > 0 ? table : null;
+  } catch {
+    return null;
+  }
+}
+
+function cmToIn(table: MeasurementTable): MeasurementTable {
+  return Object.fromEntries(
+    Object.entries(table).map(([area, vals]) => [
+      area,
+      Object.fromEntries(Object.entries(vals).map(([s, cm]) => [s, Math.round((cm / 2.54) * 10) / 10])),
+    ]),
+  );
+}
 
 /* ─── Static catalogue (fallback for reviews / measurements) ── */
 const STATIC: Record<string, StaticProduct> = {
@@ -50,25 +75,21 @@ const STATIC: Record<string, StaticProduct> = {
     name: 'STEEL GRAY T-SHIRT', price: '₹ 899.00',
     description: 'Relaxed fit t shirt with round neck and short sleeves. Featuring with print in left chest and right sleeve, Embroidery in right chest.',
     images: ['/images/products/steel-gray.jpg'], sizes: ['S', 'M', 'L', 'XL'],
-    measurementsCm: DEFAULT_MEASUREMENTS_CM, measurementsIn: DEFAULT_MEASUREMENTS_IN,
   },
   'cream-tee': {
     name: 'CREAM T-SHIRT', price: '₹ 899.00',
     description: 'Relaxed fit t shirt with round neck and short sleeves. Featuring with print in left chest and right sleeve, Embroidery in right chest.',
     images: ['/images/products/cream.jpg'], sizes: ['S', 'M', 'L', 'XL'],
-    measurementsCm: DEFAULT_MEASUREMENTS_CM, measurementsIn: DEFAULT_MEASUREMENTS_IN,
   },
   'red-tee': {
     name: 'RED T-SHIRT', price: '₹ 899.00',
     description: 'Relaxed fit t shirt with round neck and short sleeves. Featuring with print in left chest and right sleeve, Embroidery in right chest.',
     images: ['/images/products/red.jpg'], sizes: ['S', 'M', 'L', 'XL'],
-    measurementsCm: DEFAULT_MEASUREMENTS_CM, measurementsIn: DEFAULT_MEASUREMENTS_IN,
   },
   'black-tee': {
     name: 'BLACK T-SHIRT', price: '₹ 899.00',
     description: 'Relaxed fit t shirt with round neck and short sleeves. Featuring with print in left chest and right sleeve, Embroidery in right chest.',
     images: ['/images/products/black.jpg'], sizes: ['S', 'M', 'L', 'XL'],
-    measurementsCm: DEFAULT_MEASUREMENTS_CM, measurementsIn: DEFAULT_MEASUREMENTS_IN,
   },
 };
 
@@ -214,9 +235,8 @@ export default function ProductContent({ slug, wcProduct, suggested, wcReviews, 
     setOpenAccordion(prev => prev === key ? null : key);
   }
 
-  const measurements = measureUnit === 'cm'
-    ? (staticData?.measurementsCm ?? DEFAULT_MEASUREMENTS_CM)
-    : (staticData?.measurementsIn ?? DEFAULT_MEASUREMENTS_IN);
+  const measurementsCm = parseSizeChart(wcProduct) ?? DEFAULT_MEASUREMENTS_CM;
+  const measurements = measureUnit === 'cm' ? measurementsCm : cmToIn(measurementsCm);
   // Build the review display data from real, approved WooCommerce reviews.
   // When the product has none, `reviews` stays null and the section is hidden.
   const reviewList: Review[] = (wcReviews ?? []).map(r => ({
