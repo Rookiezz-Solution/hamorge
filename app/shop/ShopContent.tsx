@@ -3,14 +3,18 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useSearchParams } from 'next/navigation';
 import { useCart } from '@/context/CartContext';
 import { useFavourites } from '@/context/FavouritesContext';
+
+interface WCCategory { id: number; name: string; slug: string; }
 
 interface WCProduct {
   id: number;
   name: string;
   slug: string;
   price: string;
+  categories?: { id: number; slug: string }[];
   images: { src: string }[];
   secondary_image?: { src: string } | null;
   stock_status?: string;
@@ -47,7 +51,14 @@ function Icon3Col({ active }: { active: boolean }) {
   );
 }
 
-export default function ShopContent({ initialProducts }: { initialProducts: WCProduct[] }) {
+export default function ShopContent({ initialProducts, categories = [] }: { initialProducts: WCProduct[]; categories?: WCCategory[] }) {
+  const searchParams = useSearchParams();
+  const requested = searchParams.get('category');
+  const activeCategory = categories.find(c => c.slug === requested)?.slug ?? null;
+  const products = activeCategory
+    ? initialProducts.filter(p => p.categories?.some(c => c.slug === activeCategory))
+    : initialProducts;
+
   const [view, setView] = useState<'2col' | '3col'>('3col');
   const [sizePicker, setSizePicker] = useState<WCProduct | null>(null);
   const { addItem } = useCart();
@@ -91,9 +102,21 @@ export default function ShopContent({ initialProducts }: { initialProducts: WCPr
 
         {/* Header row */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
-          <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 10px)', fontWeight: 700, letterSpacing: '0.08em', color: '#000' }}>
-            VIEW ALL
-          </p>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 22, overflowX: 'auto', whiteSpace: 'nowrap', marginRight: 16 }}>
+            {[{ id: 0, name: 'View all', slug: null as string | null }, ...categories].map(c => {
+              const active = c.slug === activeCategory;
+              return (
+                <Link
+                  key={c.id}
+                  href={c.slug ? `/shop?category=${c.slug}` : '/shop'}
+                  scroll={false}
+                  style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 10px)', fontWeight: active ? 700 : 400, letterSpacing: '0.08em', color: active ? '#000' : '#999', textTransform: 'uppercase', textDecoration: 'none' }}
+                >
+                  {c.name}
+                </Link>
+              );
+            })}
+          </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <button onClick={() => setView('3col')} style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, display: 'flex' }} aria-label="2-column view">
               <Icon2Col active={view === '3col'} />
@@ -105,11 +128,11 @@ export default function ShopContent({ initialProducts }: { initialProducts: WCPr
         </div>
 
         {/* Grid */}
-        {initialProducts.length === 0 ? (
+        {products.length === 0 ? (
           <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(8px, 2.2vw, 10px)', color: '#999', marginTop: 60 }}>No products available right now.</p>
         ) : (
           <div className={view === '2col' ? 'grid grid-cols-3 md:grid-cols-4 gap-x-2 gap-y-4 md:gap-x-5 md:gap-y-6' : 'grid grid-cols-2 md:grid-cols-4 gap-x-3 gap-y-6 md:gap-x-7 md:gap-y-8'}>
-            {initialProducts.map(product => {
+            {products.map(product => {
               const fav = isFavourite(product.id);
               const outOfStock = product.stock_status === 'outofstock';
               return (

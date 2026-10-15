@@ -37,6 +37,27 @@ export async function getProduct(id: number) {
   return res.json();
 }
 
+// ── WooCommerce Product Categories ───────────────────────
+
+export interface WCCategory {
+  id: number;
+  name: string;
+  slug: string;
+}
+
+/** Categories that have at least one published product, oldest-created first. */
+export async function getCategories(): Promise<WCCategory[]> {
+  const res = await fetch(
+    `${WC_API}/products/categories?per_page=100&hide_empty=true&orderby=id&order=asc`,
+    { headers: wcAuth(), next: { revalidate: 60 }, signal: AbortSignal.timeout(10000) },
+  );
+  if (!res.ok) throw new Error('Failed to fetch categories');
+  const data = (await res.json()) as WCCategory[];
+  return data
+    .filter(c => c.slug !== 'uncategorized')
+    .map(({ id, name, slug }) => ({ id, name, slug }));
+}
+
 // ── WooCommerce Product Variations (per-size stock) ──────
 
 export const SIZES = ['S', 'M', 'L', 'XL'];

@@ -1,8 +1,11 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import OfferMarquee, { MARQUEE_HEIGHT } from '@/components/OfferMarquee';
+import { getCategories } from '@/lib/wp';
 
-export default function Home() {
+export default async function Home() {
+  const categories = await getCategories().catch(() => []);
+
   return (
     <main className="bg-white">
 
@@ -79,6 +82,25 @@ export default function Home() {
           </p>
         </div>
       </section>
+
+      {categories.length > 0 && (
+        <section style={{ padding: '40px 4% 80px' }}>
+          <p style={{ fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', fontWeight: 500, letterSpacing: '0.08em', color: '#000', marginBottom: 20 }}>
+            SHOP BY CATEGORY
+          </p>
+          {categories.map(c => (
+            <Link
+              key={c.id}
+              href={`/shop?category=${c.slug}`}
+              style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '18px 0', borderTop: '1px solid #e5e5e5', fontFamily: 'var(--font-inter)', fontSize: 'clamp(10px, 2.6vw, 12px)', letterSpacing: '0.08em', color: '#000', textTransform: 'uppercase', textDecoration: 'none' }}
+            >
+              <span>{c.name}</span>
+              <span aria-hidden="true">→</span>
+            </Link>
+          ))}
+          <div style={{ borderTop: '1px solid #e5e5e5' }} />
+        </section>
+      )}
 
     </main>
   );

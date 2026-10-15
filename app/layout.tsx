@@ -9,6 +9,7 @@ import Analytics from "@/components/Analytics";
 import { CartProvider } from "@/context/CartContext";
 import { FavouritesProvider } from "@/context/FavouritesContext";
 import { AuthProvider } from "@/context/AuthContext";
+import { getCategories } from "@/lib/wp";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -34,11 +35,13 @@ export const metadata: Metadata = {
   description: "Crafted with thoughtful design and honest craftsmanship. The first collection from HAM ORGE.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const categories = await getCategories().catch(() => []);
+
   return (
     <html lang="en" className={`${inter.variable} ${alexandria.variable}`}>
       <body className="min-h-full bg-[#faf7f2] antialiased">
@@ -47,7 +50,7 @@ export default function RootLayout({
         <AuthProvider>
           <CartProvider>
             <FavouritesProvider>
-              <Navbar />
+              <Navbar categories={categories} />
               {children}
               <Footer />
               <AddedToCartPanel />

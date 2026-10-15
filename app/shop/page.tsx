@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
-import { getProducts, getProductVariations, buildSizeAvailability } from '@/lib/wp';
+import { Suspense } from 'react';
+import { getProducts, getCategories, getProductVariations, buildSizeAvailability } from '@/lib/wp';
 import ShopContent from './ShopContent';
 
 export const metadata: Metadata = {
@@ -30,10 +31,18 @@ async function withSizeAvailability(products: any[]) {
 }
 
 export default async function ShopPage() {
-  const products = await getProducts({ per_page: '20', status: 'publish' }).catch(() => []);
+  const [products, categories] = await Promise.all([
+    getProducts({ per_page: '20', status: 'publish' }).catch(() => []),
+    getCategories().catch(() => []),
+  ]);
 
   // For variable products, fetch per-size stock so out-of-stock sizes can be disabled in the size picker.
   const withAvailability = await withSizeAvailability(products);
 
-  return <ShopContent initialProducts={withAvailability} />;
+  // ShopContent reads ?category= via useSearchParams, which needs a Suspense boundary.
+  return (
+    <Suspense>
+      <ShopContent initialProducts={withAvailability} categories={categories} />
+    </Suspense>
+  );
 }

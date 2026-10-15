@@ -10,7 +10,7 @@ import { useAuth } from '@/context/AuthContext';
 import SearchOverlay from '@/components/layout/SearchOverlay';
 import { MARQUEE_HEIGHT } from '@/components/OfferMarquee';
 
-export default function Navbar() {
+export default function Navbar({ categories = [] }: { categories?: { id: number; name: string; slug: string }[] }) {
   const pathname = usePathname();
   const isHome = pathname === '/';
   const [menuOpen, setMenuOpen] = useState(false);
@@ -171,6 +171,22 @@ export default function Navbar() {
                   style={{ fontFamily: 'var(--font-inter)', fontWeight: 400, color: '#000', textDecoration: 'none', letterSpacing: '0.08em' }}>
                   T-SHIRTS
                 </Link>
+                {categories.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingLeft: 14 }}>
+                    <Link href="/shop" onClick={() => setMenuOpen(false)}
+                      className="text-[10px] md:text-[12px]"
+                      style={{ fontFamily: 'var(--font-inter)', fontWeight: 400, color: '#555', textDecoration: 'none', letterSpacing: '0.08em' }}>
+                      VIEW ALL
+                    </Link>
+                    {categories.map(c => (
+                      <Link key={c.id} href={`/shop?category=${c.slug}`} onClick={() => setMenuOpen(false)}
+                        className="text-[10px] md:text-[12px]"
+                        style={{ fontFamily: 'var(--font-inter)', fontWeight: 400, color: '#555', textDecoration: 'none', letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                        {c.name}
+                      </Link>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* CUSTOMER SERVICE */}
