@@ -45,16 +45,17 @@ export interface WCCategory {
   slug: string;
 }
 
-/** Categories that have at least one published product, oldest-created first. */
+/** Categories that have at least one published product, by their WooCommerce sort order (ties: oldest first). */
 export async function getCategories(): Promise<WCCategory[]> {
   const res = await fetch(
     `${WC_API}/products/categories?per_page=100&hide_empty=true&orderby=id&order=asc`,
     { headers: wcAuth(), next: { revalidate: 60 }, signal: AbortSignal.timeout(10000) },
   );
   if (!res.ok) throw new Error('Failed to fetch categories');
-  const data = (await res.json()) as WCCategory[];
+  const data = (await res.json()) as (WCCategory & { menu_order?: number })[];
   return data
     .filter(c => c.slug !== 'uncategorized')
+    .sort((a, b) => (a.menu_order ?? 0) - (b.menu_order ?? 0))
     .map(({ id, name, slug }) => ({ id, name, slug }));
 }
 
