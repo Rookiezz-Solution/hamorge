@@ -1,4 +1,6 @@
-const MESSAGE = 'FLAT 10% OFF ON YOUR FIRST PURCHASE';
+import { FIRST_ORDER_COUPON_CODE } from '@/lib/coupons';
+
+const MESSAGE = `FLAT 10% OFF ON FIRST PURCHASE, CODE : ${FIRST_ORDER_COUPON_CODE}`;
 
 // Repeated enough times that the strip never runs out of content mid-scroll
 // on ultra-wide screens — the animation loops the whole track at -50%, so as
@@ -32,7 +34,7 @@ export default function OfferMarquee() {
           alignItems: 'center',
           height: '100%',
           width: 'max-content',
-          animation: 'offer-marquee-scroll 22s linear infinite',
+          animation: 'offer-marquee-scroll 33s linear infinite',
         }}
       >
         {[0, 1].map((track) => (
