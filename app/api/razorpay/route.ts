@@ -61,6 +61,8 @@ export async function POST(req: NextRequest) {
     id: order.id,
     amount: order.amount,
     currency: order.currency,
-    key_id: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+    // Same runtime variable the order was created with — NEXT_PUBLIC_* is frozen at build
+    // time, so reading it here could hand the browser a different key than the server's.
+    key_id: process.env.RAZORPAY_KEY_ID,
   });
 }
