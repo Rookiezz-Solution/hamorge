@@ -13,12 +13,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Name, email and password are required.' }, { status: 400 });
     }
 
-    // Verification is required only when a phone number is actually being
-    // submitted — the full /account/register page always sends one (and its
-    // WhatsApp OTP), but CheckoutGate's quick mid-checkout registration
-    // deliberately never collects a phone at all, and shouldn't be forced
-    // through a verification step that would just add friction to someone
-    // checking out.
+    // Every registration — the /account/register page and the sign-up inside
+    // checkout alike — must carry a phone number and a valid WhatsApp code.
+    // Don't make this conditional on `phone` being present: that turns
+    // verification into something a caller can skip by just leaving it out.
     //
     // Checked here, atomically with account creation, rather than as a
     // separate step the client calls first — the OTP has no reusable
@@ -26,14 +24,15 @@ export async function POST(req: NextRequest) {
     // verifying and creating the account in the same request is what stops
     // the code being spent without an account to show for it if creation
     // then failed for an unrelated reason.
-    if (phone) {
-      if (!otp || !otpToken) {
-        return NextResponse.json({ error: 'WhatsApp verification is required to register.' }, { status: 400 });
-      }
-      const result = verifyOtp(phone, otp, otpToken);
-      if (!result.ok) {
-        return NextResponse.json({ error: result.error ?? 'Invalid or expired code.' }, { status: 400 });
-      }
+    if (!/^\d{10}$/.test(String(phone ?? ''))) {
+      return NextResponse.json({ error: 'A valid 10-digit phone number is required.' }, { status: 400 });
+    }
+    if (!otp || !otpToken) {
+      return NextResponse.json({ error: 'WhatsApp verification is required to register.' }, { status: 400 });
+    }
+    const result = verifyOtp(phone, otp, otpToken);
+    if (!result.ok) {
+      return NextResponse.json({ error: result.error ?? 'Invalid or expired code.' }, { status: 400 });
     }
 
     const auth = Buffer.from(`${KEY}:${SECRET}`).toString('base64');

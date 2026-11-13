@@ -34,7 +34,7 @@ function BackButton({ onClick }: { onClick: () => void }) {
 }
 
 export default function CheckoutGate({ onClose, onAuth, onGuest }: Props) {
-  const { login, register, sendForgotPasswordOtp, resetPassword } = useAuth();
+  const { login, register, sendRegisterOtp, sendForgotPasswordOtp, resetPassword } = useAuth();
   const router = useRouter();
   const [view, setView] = useState<View>('choose');
   const [loading, setLoading] = useState(false);
@@ -50,6 +50,11 @@ export default function CheckoutGate({ onClose, onAuth, onGuest }: Props) {
   const [regEmail, setRegEmail] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [regPhone, setRegPhone] = useState('');
+  // 'form' = filling in details, 'otp' = WhatsApp code sent, awaiting verification (account is only created after it passes).
+  const [regStep, setRegStep] = useState<'form' | 'otp'>('form');
+  const [regOtp, setRegOtp] = useState('');
+  const [regOtpToken, setRegOtpToken] = useState('');
 
   // Forgot password fields — 'phone' = enter registered number, 'reset' = code sent, enter it plus a new password.
   const [forgotStep, setForgotStep] = useState<'phone' | 'reset'>('phone');
@@ -63,6 +68,7 @@ export default function CheckoutGate({ onClose, onAuth, onGuest }: Props) {
 
   function switchTo(v: View) {
     setError('');
+    if (v === 'register') { setRegStep('form'); setRegOtp(''); }
     setView(v);
   }
 
@@ -84,12 +90,27 @@ export default function CheckoutGate({ onClose, onAuth, onGuest }: Props) {
     router.push('/address');
   }
 
+  // Step 1: validate, then send a WhatsApp code. The account isn't created here — only once
+  // the code is confirmed server-side in /api/auth/register (see handleVerifyRegister).
   async function handleRegister(e: React.FormEvent) {
     e.preventDefault();
     if (regPassword !== confirmPassword) { setError('Passwords do not match.'); return; }
+    if (!/^\d{10}$/.test(regPhone)) { setError('Enter a valid 10-digit phone number.'); return; }
     setLoading(true);
     setError('');
-    const err = await register({ firstName, lastName, email: regEmail, phone: '', password: regPassword });
+    const { token, error: sendErr } = await sendRegisterOtp(regPhone);
+    setLoading(false);
+    if (sendErr || !token) { setError(sendErr ?? 'Could not send the code.'); return; }
+    setRegOtpToken(token);
+    setRegStep('otp');
+  }
+
+  // Step 2: submit the code with the details; the account is created only if it checks out.
+  async function handleVerifyRegister(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    const err = await register({ firstName, lastName, email: regEmail, phone: regPhone, password: regPassword, otp: regOtp, otpToken: regOtpToken });
     setLoading(false);
     if (err) { setError(err); return; }
     if (onAuth) { onAuth(); return; }
@@ -370,61 +391,110 @@ export default function CheckoutGate({ onClose, onAuth, onGuest }: Props) {
               CREATE ACCOUNT
             </p>
 
-            <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            {regStep === 'form' ? (
+              <form onSubmit={handleRegister} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <input
+                    required placeholder="FIRST NAME" value={firstName}
+                    onChange={e => setFirstName(e.target.value)} style={inputStyle}
+                  />
+                  <input
+                    placeholder="LAST NAME" value={lastName}
+                    onChange={e => setLastName(e.target.value)} style={inputStyle}
+                  />
+                </div>
+
                 <input
-                  required placeholder="FIRST NAME" value={firstName}
-                  onChange={e => setFirstName(e.target.value)} style={inputStyle}
+                  required type="email" placeholder="EMAIL" value={regEmail}
+                  onChange={e => setRegEmail(e.target.value)} style={inputStyle}
                 />
+
+                <div style={{ display: 'flex', alignItems: 'center', borderBottom: '1px solid #ccc' }}>
+                  <span style={{ fontFamily: 'var(--font-inter)', fontSize: 12, color: '#555', padding: '10px 8px 10px 0' }}>+91</span>
+                  <input
+                    required type="tel" inputMode="numeric" placeholder="10-DIGIT MOBILE NUMBER" value={regPhone}
+                    onChange={e => setRegPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    style={{ ...inputStyle, border: 'none', padding: '10px 0' }}
+                  />
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                  <input
+                    required type="password" placeholder="PASSWORD" value={regPassword}
+                    onChange={e => setRegPassword(e.target.value)} style={inputStyle} minLength={8}
+                  />
+                  <input
+                    required type="password" placeholder="CONFIRM" value={confirmPassword}
+                    onChange={e => setConfirmPassword(e.target.value)} style={inputStyle} minLength={8}
+                  />
+                </div>
+
+                <p style={{ fontFamily: 'var(--font-inter)', fontSize: 11, color: '#888', lineHeight: 1.6 }}>
+                  We&apos;ll send a verification code to your WhatsApp number to confirm your account.
+                </p>
+
+                {error && (
+                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: 12, color: '#c00' }}>{error}</p>
+                )}
+
+                <button
+                  type="submit" disabled={loading}
+                  style={{
+                    width: '100%', height: 52, background: loading ? '#f5f5f5' : '#fff',
+                    border: '1px solid #000', fontFamily: 'var(--font-inter)', fontSize: 12,
+                    letterSpacing: '0.14em', color: '#000',
+                    cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4,
+                  }}
+                >
+                  {loading ? 'SENDING CODE…' : 'CONTINUE'}
+                </button>
+
+                <p style={{ fontFamily: 'var(--font-inter)', fontSize: 12, color: '#555', textAlign: 'center' }}>
+                  Already have an account?{' '}
+                  <button
+                    type="button"
+                    onClick={() => switchTo('login')}
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-inter)', fontSize: 12, color: '#000', textDecoration: 'underline' }}
+                  >
+                    Log in
+                  </button>
+                </p>
+              </form>
+            ) : (
+              <form onSubmit={handleVerifyRegister} style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+                <p style={{ fontFamily: 'var(--font-inter)', fontSize: 12, color: '#555', lineHeight: 1.6 }}>
+                  Code sent to +91 {regPhone} via WhatsApp. Enter it below to create your account.
+                </p>
                 <input
-                  placeholder="LAST NAME" value={lastName}
-                  onChange={e => setLastName(e.target.value)} style={inputStyle}
+                  required autoFocus type="text" inputMode="numeric" placeholder="6-DIGIT CODE" value={regOtp}
+                  onChange={e => setRegOtp(e.target.value.replace(/\D/g, '').slice(0, 6))} style={inputStyle}
                 />
-              </div>
 
-              <input
-                required type="email" placeholder="EMAIL" value={regEmail}
-                onChange={e => setRegEmail(e.target.value)} style={inputStyle}
-              />
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-                <input
-                  required type="password" placeholder="PASSWORD" value={regPassword}
-                  onChange={e => setRegPassword(e.target.value)} style={inputStyle} minLength={8}
-                />
-                <input
-                  required type="password" placeholder="CONFIRM" value={confirmPassword}
-                  onChange={e => setConfirmPassword(e.target.value)} style={inputStyle} minLength={8}
-                />
-              </div>
-
-              {error && (
-                <p style={{ fontFamily: 'var(--font-inter)', fontSize: 12, color: '#c00' }}>{error}</p>
-              )}
-
-              <button
-                type="submit" disabled={loading}
-                style={{
-                  width: '100%', height: 52, background: loading ? '#f5f5f5' : '#fff',
-                  border: '1px solid #000', fontFamily: 'var(--font-inter)', fontSize: 12,
-                  letterSpacing: '0.14em', color: '#000',
-                  cursor: loading ? 'not-allowed' : 'pointer', marginTop: 4,
-                }}
-              >
-                {loading ? 'CREATING ACCOUNT…' : 'CREATE & CONTINUE TO CHECKOUT'}
-              </button>
-
-              <p style={{ fontFamily: 'var(--font-inter)', fontSize: 12, color: '#555', textAlign: 'center' }}>
-                Already have an account?{' '}
                 <button
                   type="button"
-                  onClick={() => switchTo('login')}
-                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-inter)', fontSize: 12, color: '#000', textDecoration: 'underline' }}
+                  onClick={() => { setRegStep('form'); setRegOtp(''); setError(''); }}
+                  style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'var(--font-inter)', fontSize: 12, color: '#000', textDecoration: 'underline', alignSelf: 'flex-start' }}
                 >
-                  Log in
+                  Change details / resend
                 </button>
-              </p>
-            </form>
+
+                {error && (
+                  <p style={{ fontFamily: 'var(--font-inter)', fontSize: 12, color: '#c00' }}>{error}</p>
+                )}
+
+                <button
+                  type="submit" disabled={loading || regOtp.length !== 6}
+                  style={{
+                    width: '100%', height: 52, background: loading ? '#f5f5f5' : '#fff',
+                    border: '1px solid #000', fontFamily: 'var(--font-inter)', fontSize: 12,
+                    letterSpacing: '0.14em', color: '#000',
+                    cursor: loading || regOtp.length !== 6 ? 'not-allowed' : 'pointer', marginTop: 4,
+                  }}
+                >
+                  {loading ? 'VERIFYING…' : 'VERIFY & CONTINUE TO CHECKOUT'}
+                </button>
+              </form>
+            )}
           </>
         )}
 

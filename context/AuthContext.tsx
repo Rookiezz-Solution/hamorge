@@ -28,12 +28,9 @@ interface RegisterData {
   phone: string;
   password: string;
   /** The code sent to `phone` via sendRegisterOtp, plus the token it
-   *  returned — the backend re-verifies both before creating the account.
-   *  Required whenever `phone` is non-empty; omit all three together (e.g.
-   *  the CheckoutGate quick-registration path, which never collects a
-   *  phone). */
-  otp?: string;
-  otpToken?: string;
+   *  returned — the backend re-verifies both before creating the account. */
+  otp: string;
+  otpToken: string;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
